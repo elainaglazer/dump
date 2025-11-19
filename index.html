@@ -77,6 +77,20 @@
         .sub-desc { font-size: 0.8em; color: var(--text-meta); margin-top: 5px; }
         .admin-indicator { color: var(--badge-maid-text); font-weight: bold; display: none; margin-top: 5px; font-size: 0.9em; }
 
+        /* Visit counter in header */
+        #visit-count {
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 0.85em;
+            color: var(--text-meta);
+            background: #ffffff;
+            padding: 4px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(0,0,0,0.04);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+            font-weight: 700;
+        }
+
         /* Top-center banner for non-blocking admin notification */
         #maid-banner {
             position: fixed;
@@ -222,6 +236,7 @@
         <div class="admin-indicator">
             ✨ ADMIN MODE ACTIVE ✨
         </div>
+        <div id="visit-count" title="Total visits">Visits: —</div>
     </div>
 
     <!-- Non-blocking top banner (hidden by default) -->
@@ -286,6 +301,45 @@
                 banner.classList.remove('visible');
                 banner.setAttribute('aria-hidden', 'true');
             }, 3000);
+        }
+
+        // --- Visit tracking ---
+        // Records a visit by inserting a row into the 'visits' table and updates the visit count UI.
+        async function recordVisit() {
+            const visitEl = document.getElementById('visit-count');
+            if (!visitEl) return;
+
+            // Try to get IP (best-effort). If it fails we'll still insert without IP.
+            let ip = null;
+            try {
+                const res = await fetch('https://api.ipify.org?format=json');
+                const j = await res.json();
+                ip = j.ip;
+            } catch (e) {
+                console.warn('Could not fetch IP for visit:', e);
+            }
+
+            try {
+                // Insert a visit row. Schema: visits(id serial, ip text, ua text, created_at timestamptz default now())
+                const { error: insErr } = await sb.from('visits').insert({ ip: ip, ua: navigator.userAgent });
+                if (insErr) console.warn('visit insert error', insErr.message || insErr);
+            } catch (e) {
+                console.warn('visit insert exception', e);
+            }
+
+            // Fetch total count (uses head:true + count:'exact' to avoid returning rows)
+            try {
+                const { count, error } = await sb.from('visits').select('*', { head: true, count: 'exact' });
+                if (error) {
+                    console.warn('visit count error', error.message || error);
+                    visitEl.textContent = 'Visits: —';
+                } else {
+                    visitEl.textContent = `Visits: ${count ?? '0'}`;
+                }
+            } catch (e) {
+                console.warn('visit count exception', e);
+                visitEl.textContent = 'Visits: —';
+            }
         }
 
         // --- ADMIN MODE LOGIC ---
@@ -506,7 +560,11 @@
             .subscribe();
 
         // Initial Load
-        loadPosts();
+        // Start: record visit then load posts
+        (async () => {
+            try { await recordVisit(); } catch (e) { console.warn(e); }
+            loadPosts();
+        })();
     </script>
 </body>
 </html>

@@ -183,7 +183,7 @@
 <body>
 
     <div class="header-container">
-        <img src="" id="siteLogo" class="logo" alt="Logo" onerror="this.style.display='none'">
+        <img id="siteLogo" class="logo" alt="Logo" style="display:none"> 
         <h1>/dump/ log</h1>
     </div>
 
@@ -210,7 +210,9 @@
         const bucketName = 'uploads';
         const tableName = 'posts';
 
-        document.getElementById('siteLogo').src = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/logo.png`;
+        const logoEl = document.getElementById('siteLogo');
+        logoEl.onload = function() { this.style.display = 'block'; }; // Show when loaded
+        logoEl.src = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/logo.png`;
 
         // Time Ago Logic
         function timeAgo(dateParam) {

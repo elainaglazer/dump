@@ -26,6 +26,7 @@ Have fun.
 Image board. blatant rip off of 5ch, (even the ip leak)
 
 - *No login*
+- *pretty lightweight*
 - *Mobile friendly*
 - *literally everything is real time refresh*
 - *some chart i guess*

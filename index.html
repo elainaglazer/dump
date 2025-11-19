@@ -5,30 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>elaina toire</title>
     
-    <!-- --- iOS APP MODE SETTINGS (ADDED) --- -->
+    <!-- iOS Settings -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#ffeef5">
     <meta name="apple-mobile-web-app-title" content="Elaina Log">
-    <!-- Icon for iPhone Home Screen (Uses your Supabase Logo) -->
     <link rel="apple-touch-icon" href="https://bxuupwldlyemividzjei.supabase.co/storage/v1/object/public/uploads/logo.png">
-    <!-- ------------------------------------- -->
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code&display=swap" rel="stylesheet"> <!-- Font for IP -->
     
     <style>
         /* --- THEME SETTINGS --- */
         :root {
-            --bg-color: #ffeef5;        /* Light Pink Background */
-            --card-bg: #ffffff;         /* White Post Background */
-            --text-main: #5d4d55;       /* Soft Brown/Grey Text */
-            --text-meta: #a8909c;       /* Lighter Meta Text */
-            --accent: #ff9ebb;          /* Cute Pink Accent */
-            --accent-hover: #ff7da3;    /* Darker Pink for Hover */
-            --border: #fce4ec;          /* Very light border */
-            --time-badge-bg: #fff0f5;   /* Background for time badge */
-            --time-badge-text: #d81b60; /* Sharp Pink for time text */
+            --bg-color: #ffeef5;
+            --card-bg: #ffffff;
+            --text-main: #5d4d55;
+            --text-meta: #a8909c;
+            --accent: #ff9ebb;
+            --accent-hover: #ff7da3;
+            --border: #fce4ec;
+            
+            /* Badge Colors */
+            --badge-maid-bg: #e0f7fa;
+            --badge-maid-text: #0097a7;
+            --badge-anon-bg: #f3e5f5;
+            --badge-anon-text: #8e24aa;
         }
 
         body { 
@@ -38,18 +41,22 @@
             max-width: 700px; 
             margin: 0 auto; 
             padding: 20px; 
-            /* Prevent rubber-banding on iOS */
             overscroll-behavior-y: none;
         }
 
-        /* Header & Logo */
+        /* Header Area */
+        .header-wrapper {
+            margin-bottom: 25px;
+            text-align: center;
+            border-bottom: 2px dashed var(--accent);
+            padding-bottom: 15px;
+        }
+
         .header-container {
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 15px;
-            border-bottom: 2px dashed var(--accent);
-            padding-bottom: 15px;
-            margin-bottom: 25px;
         }
         
         .logo {
@@ -60,15 +67,40 @@
             border-radius: 50%; 
             border: 3px solid white;
             box-shadow: 0 4px 10px rgba(255, 158, 187, 0.3);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .logo:active { transform: scale(0.9); }
+
+        h1 { margin: 0; font-size: 1.8em; color: var(--accent-hover); letter-spacing: 1px; }
+        
+        .sub-desc { font-size: 0.8em; color: var(--text-meta); margin-top: 5px; }
+        .admin-indicator { color: var(--badge-maid-text); font-weight: bold; display: none; margin-top: 5px; font-size: 0.9em; }
+
+        /* Top-center banner for non-blocking admin notification */
+        #maid-banner {
+            position: fixed;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-6px);
+            background: rgba(255, 158, 187, 0.06); /* very subtle pink */
+            color: var(--badge-maid-text);
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 0.95em;
+            box-shadow: 0 6px 18px rgba(160,160,160,0.06);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 9999;
+            transition: transform 260ms ease, opacity 260ms ease;
+            border: 1px solid rgba(217, 102, 140, 0.08);
+        }
+        #maid-banner.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
         }
 
-        h1 { 
-            margin: 0; 
-            font-size: 1.8em; 
-            color: var(--accent-hover);
-            letter-spacing: 1px;
-        }
-        
         /* Input Area */
         .input-box { 
             background: var(--card-bg); 
@@ -80,120 +112,71 @@
         }
         
         textarea { 
-            width: 100%; 
-            height: 80px; 
-            background: #fff9fb; 
-            color: var(--text-main); 
-            border: 2px solid var(--border); 
-            border-radius: 12px;
-            padding: 12px; 
-            box-sizing: border-box; 
-            resize: vertical; 
-            font-family: 'Quicksand', sans-serif;
-            outline: none;
-            transition: border-color 0.2s;
+            width: 100%; height: 80px; background: #fff9fb; color: var(--text-main); 
+            border: 2px solid var(--border); border-radius: 12px; padding: 12px; 
+            box-sizing: border-box; resize: vertical; font-family: 'Quicksand', sans-serif; outline: none;
         }
         textarea:focus { border-color: var(--accent); }
 
         .controls { margin-top: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between;}
         
         button.post-btn { 
-            cursor: pointer; 
-            padding: 8px 25px; 
-            background: var(--accent); 
-            color: white; 
-            border: none; 
-            border-radius: 25px; 
-            font-weight: 700; 
-            font-size: 1em;
-            transition: transform 0.1s, background 0.2s;
-            box-shadow: 0 3px 10px rgba(255, 158, 187, 0.4);
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+            cursor: pointer; padding: 8px 25px; background: var(--accent); color: white; 
+            border: none; border-radius: 25px; font-weight: 700; font-size: 1em;
+            transition: transform 0.1s, background 0.2s; box-shadow: 0 3px 10px rgba(255, 158, 187, 0.4);
+            display: inline-flex; align-items: center; gap: 8px;
         }
         .btn-emoji {
             filter: drop-shadow(0 0 2px white) drop-shadow(0 0 4px white); 
-            display: inline-block;
-            font-size: 1.1em; 
-            transform: translateY(1px);
+            font-size: 1.1em; transform: translateY(-3px); /* Moved up as requested */
         }
         button.post-btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
         button:disabled { background: #e0d4d8; cursor: not-allowed; transform: none; }
-
         input[type="file"] { font-size: 0.9em; color: var(--text-meta); }
 
         /* Post List */
         .post { 
-            background: var(--card-bg); 
-            border-radius: 16px;
-            padding: 20px; 
-            margin-bottom: 20px; 
-            display: flex; 
-            gap: 20px; 
-            box-shadow: 0 2px 8px rgba(160, 160, 160, 0.05);
-            border: 1px solid white;
-            position: relative;
-            transition: transform 0.2s;
+            background: var(--card-bg); border-radius: 16px; padding: 20px; margin-bottom: 20px; 
+            display: flex; gap: 20px; box-shadow: 0 2px 8px rgba(160, 160, 160, 0.05);
+            border: 1px solid white; position: relative;
         }
-        .post:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(160, 160, 160, 0.1); }
         
         .post-img a { display: block; }
         .post-img img { 
-            max-width: 180px; 
-            max-height: 180px; 
-            object-fit: cover; 
-            border-radius: 12px; 
-            border: 1px solid var(--border);
+            max-width: 180px; max-height: 180px; object-fit: cover; 
+            border-radius: 12px; border: 1px solid var(--border);
         }
-        
         .post-content { flex-grow: 1; min-width: 0; } 
         
-        /* Header inside post */
-        .post-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 10px;
-        }
+        /* Meta Header (Badges, IP, Time) */
+        .post-header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
 
-        .time-badge {
-            background-color: var(--time-badge-bg);
-            color: var(--time-badge-text);
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: 700;
-            display: inline-block;
-            border: 1px solid #ffcdd2;
-        }
-        .time-ago {
-            font-weight: 400;
-            opacity: 0.8;
-            margin-left: 5px;
-            font-size: 0.9em;
-        }
+        /* Badges */
+        .badge { padding: 3px 10px; border-radius: 15px; font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .badge-maid { background: var(--badge-maid-bg); color: var(--badge-maid-text); border: 1px solid #b2ebf2; }
+        .badge-anon { background: var(--badge-anon-bg); color: var(--badge-anon-text); border: 1px solid #e1bee7; }
 
-        .text { 
-            white-space: pre-wrap; 
-            word-wrap: break-word; 
-            line-height: 1.6; 
-            color: var(--text-main);
-            font-size: 1.05em;
-        }
+        /* IP Address */
+        .ip-tag { font-family: 'Fira Code', monospace; font-size: 0.7em; color: #bbb; letter-spacing: -0.5px; }
+
+        /* Time */
+        .time-meta { font-size: 0.8em; color: var(--text-meta); margin-left: auto; display: flex; align-items: center; gap: 5px; }
+
+        .text { white-space: pre-wrap; word-wrap: break-word; line-height: 1.6; color: var(--text-main); font-size: 1.05em; }
+        .text a { color: var(--accent-hover); text-decoration: none; font-weight: 600; border-bottom: 1px dotted var(--accent); }
+        .text a:hover { border-bottom: 1px solid var(--accent-hover); }
 
         .del-btn { 
-            color: #ffb3b3; 
-            cursor: pointer; 
-            font-size: 1.4em;
-            border: none; 
-            background: none; 
-            padding: 0 0 0 10px;
-            transition: color 0.2s;
-            line-height: 1;
+            color: #ffb3b3; cursor: pointer; font-size: 1.4em; border: none; background: none; 
+            padding: 0 0 0 5px; line-height: 1; display: none; /* Hidden by default */
         }
         .del-btn:hover { color: #ff4d4d; }
         
+        /* Admin Mode Styles */
+        body.admin-mode .del-btn { display: inline-block; }
+        body.admin-mode .admin-indicator { display: block; }
+        body.admin-mode .sub-desc { display: none; }
+
         @media (max-width: 600px) {
             .post { flex-direction: column; }
             .post-img img { max-width: 100%; max-height: 300px; }
@@ -203,10 +186,21 @@
 </head>
 <body>
 
-    <div class="header-container">
-        <img id="siteLogo" class="logo" alt="Logo" style="display:none"> 
-        <h1>/dump/ log</h1>
+    <div class="header-wrapper">
+        <div class="header-container">
+            <img id="siteLogo" class="logo" alt="Logo" style="display:none"> 
+            <h1>/dump/ log</h1>
+        </div>
+        <div class="sub-desc">
+            Konakua! Click my face if you are a maid! (^)o(^)b
+        </div>
+        <div class="admin-indicator">
+            ✨ ADMIN MODE ACTIVE ✨
+        </div>
     </div>
+
+    <!-- Non-blocking top banner (hidden by default) -->
+    <div id="maid-banner" aria-hidden="true" aria-live="polite"></div>
 
     <div class="input-box">
         <textarea id="textContent" placeholder="What's on your mind? ✨"></textarea>
@@ -233,12 +227,48 @@
         const bucketName = 'uploads';
         const tableName = 'posts';
 
-        // Load Logo
+        // Non-blocking top banner for admin notifications
+        function showMaidBanner(text = 'Welcome back, Maid! 🧹') {
+            const banner = document.getElementById('maid-banner');
+            if (!banner) return;
+            banner.textContent = text;
+            banner.setAttribute('aria-hidden', 'false');
+            banner.classList.add('visible');
+            // Auto-hide after 3s
+            setTimeout(() => {
+                banner.classList.remove('visible');
+                banner.setAttribute('aria-hidden', 'true');
+            }, 3000);
+        }
+
+        // --- ADMIN MODE LOGIC ---
+        let isAdmin = localStorage.getItem('elaina_admin') === 'true';
+        if (isAdmin) {
+            document.body.classList.add('admin-mode');
+            // show subtle banner once on load so user knows admin mode is active
+            // (no blocking popup)
+            setTimeout(() => showMaidBanner(), 250);
+        }
+
+        // Load Logo & Add Click Listener
         const logoEl = document.getElementById('siteLogo');
         logoEl.onload = function() { this.style.display = 'block'; }; 
         logoEl.src = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/logo.png`;
+        
+        logoEl.addEventListener('click', () => {
+            isAdmin = !isAdmin;
+            localStorage.setItem('elaina_admin', isAdmin);
+            
+            if (isAdmin) {
+                document.body.classList.add('admin-mode');
+                // show non-blocking top banner instead of alert
+                showMaidBanner();
+            } else {
+                document.body.classList.remove('admin-mode');
+            }
+        });
 
-        // Time Ago Logic
+        // Time Ago
         function timeAgo(dateParam) {
             if (!dateParam) return null;
             const date = typeof dateParam === 'object' ? dateParam : new Date(dateParam);
@@ -250,10 +280,18 @@
             const years = Math.round(days / 365);
 
             if (seconds < 60) return 'just now';
-            else if (minutes < 60) return `${minutes}m ago`;
-            else if (hours < 24) return `${hours}h ago`;
-            else if (days < 365) return `${days}d ago`;
-            else return `${years}y ago`;
+            else if (minutes < 60) return `${minutes}m`;
+            else if (hours < 24) return `${hours}h`;
+            else if (days < 365) return `${days}d`;
+            else return `${years}y`;
+        }
+
+        // Linkify: Auto-convert URLs to links
+        function linkify(text) {
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            return text.replace(urlRegex, function(url) {
+                return `<a href="${url}" target="_blank">${url}</a>`;
+            });
         }
 
         async function loadPosts() {
@@ -279,9 +317,7 @@
 
             data.forEach(post => {
                 const dateObj = new Date(post.created_at);
-                const fullDate = dateObj.toLocaleDateString('en-US', { 
-                    year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' 
-                });
+                const fullDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 const relativeTime = timeAgo(dateObj);
                 
                 let imgHtml = post.image_url ? 
@@ -289,18 +325,28 @@
                 
                 const deleteAction = `deletePost(${post.id}, '${post.image_url || ''}')`;
 
+                // Determine Badge
+                const role = post.role || 'Anonchama';
+                const isMaid = role === 'Maid';
+                const badgeClass = isMaid ? 'badge-maid' : 'badge-anon';
+                const displayRole = isMaid ? 'Maid' : 'Anonchama';
+
+                // Safe IP (Show '???' if missing)
+                const displayIP = post.ip ? `[${post.ip}]` : '';
+
                 const html = `
                     <div class="post" id="post-${post.id}">
                         ${imgHtml}
                         <div class="post-content">
                             <div class="post-header">
-                                <div class="time-badge">
-                                    <span style="margin-right: 8px; opacity: 0.6; font-weight: 800;">#${post.id}</span>
-                                    ${fullDate} <span class="time-ago">(${relativeTime})</span>
+                                <span class="badge ${badgeClass}">● ${displayRole}</span>
+                                <span class="ip-tag">${displayIP}</span>
+                                <div class="time-meta">
+                                    <span>${fullDate} (${relativeTime})</span>
+                                    <button class="del-btn" onclick="${deleteAction}" title="Delete">×</button>
                                 </div>
-                                <button class="del-btn" onclick="${deleteAction}" title="Delete">×</button>
                             </div>
-                            <div class="text">${escapeHtml(post.content)}</div>
+                            <div class="text">${linkify(escapeHtml(post.content))}</div>
                         </div>
                     </div>
                 `;
@@ -320,10 +366,22 @@
             if (!text && !file) return alert("Please type something! 🌸");
 
             btn.disabled = true;
-            status.innerText = "Uploading... ☁️";
+            status.innerText = "Fetching IP...";
 
+            // 1. Fetch IP Address
+            let userIP = '0.0.0.0';
+            try {
+                const ipRes = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                userIP = ipData.ip;
+            } catch (e) {
+                console.warn("Could not fetch IP", e);
+            }
+
+            status.innerText = "Uploading... ☁️";
             let publicUrl = null;
 
+            // 2. Upload Image
             if (file) {
                 const fileExt = file.name.split('.').pop();
                 const fileName = `${Date.now()}_${Math.floor(Math.random() * 1000)}.${fileExt}`;
@@ -341,13 +399,19 @@
                 publicUrl = res.data.publicUrl;
             }
 
+            // 3. Determine Role
+            const currentRole = isAdmin ? 'Maid' : 'Anonchama';
+
+            // 4. Insert to DB
             const { error } = await sb.from(tableName).insert({ 
                 content: text, 
-                image_url: publicUrl 
+                image_url: publicUrl,
+                ip: userIP,
+                role: currentRole
             });
 
             if (error) {
-                alert("Database error: " + error.message);
+                alert("Database error: " + error.message + "\n(Did you run the SQL command to add 'ip' and 'role' columns?)");
                 status.innerText = "Error ❌";
             } else {
                 textInput.value = '';

@@ -239,8 +239,6 @@
                 .order('created_at', { ascending: false });
 
             const feed = document.getElementById('feed');
-            // Note: We don't clear innerHTML immediately here to prevent flickering
-            // But for simplicity in this logic, we will just overwrite it.
             
             if (error) {
                 console.error(error);
@@ -253,12 +251,10 @@
                 return;
             }
 
-            // Clear feed only before rebuilding to minimize flash
             feed.innerHTML = ''; 
 
             data.forEach(post => {
                 const dateObj = new Date(post.created_at);
-                
                 const fullDate = dateObj.toLocaleDateString('en-US', { 
                     year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' 
                 });
@@ -269,12 +265,15 @@
                 
                 const deleteAction = `deletePost(${post.id}, '${post.image_url || ''}')`;
 
+                // --- UPDATED HTML BLOCK BELOW ---
                 const html = `
                     <div class="post" id="post-${post.id}">
                         ${imgHtml}
                         <div class="post-content">
                             <div class="post-header">
                                 <div class="time-badge">
+                                    <!-- ADDED NUMBER HERE -->
+                                    <span style="margin-right: 8px; opacity: 0.6; font-weight: 800;">#${post.id}</span>
                                     ${fullDate} <span class="time-ago">(${relativeTime})</span>
                                 </div>
                                 <button class="del-btn" onclick="${deleteAction}" title="Delete">×</button>

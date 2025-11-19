@@ -94,15 +94,19 @@
             pointer-events: none;
             z-index: 9999;
             transition: transform 260ms ease, opacity 260ms ease;
-            border: 1px solid rgba(217, 102, 140, 0.08);
+            /* stronger white border so the pill separates from similar backgrounds */
+            border: 1px solid rgba(255,255,255,0.92);
+            /* subtle frosted backdrop so overlapping content doesn't show through */
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
         }
         #maid-banner.visible {
             transform: translateX(-50%) translateY(0);
             opacity: 1;
         }
         /* Variant colors */
-        #maid-banner.maid { background: rgba(255, 158, 187, 0.08); color: var(--badge-maid-text); border-color: rgba(217, 102, 140, 0.12); }
-        #maid-banner.user { background: rgba(200, 230, 255, 0.08); color: #2a6ea3; border-color: rgba(120, 170, 220, 0.12); }
+    #maid-banner.maid { background: rgba(255, 158, 187, 0.08); color: var(--badge-maid-text); border-color: rgba(255,255,255,0.92); }
+    #maid-banner.user { background: rgba(200, 230, 255, 0.08); color: #2a6ea3; border-color: rgba(255,255,255,0.92); }
 
         /* Input Area */
         .input-box { 

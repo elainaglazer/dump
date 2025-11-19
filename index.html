@@ -2,10 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>elaina toire</title>
+    
+    <!-- --- iOS APP MODE SETTINGS (ADDED) --- -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#ffeef5">
+    <meta name="apple-mobile-web-app-title" content="Elaina Log">
+    <!-- Icon for iPhone Home Screen (Uses your Supabase Logo) -->
+    <link rel="apple-touch-icon" href="https://bxuupwldlyemividzjei.supabase.co/storage/v1/object/public/uploads/logo.png">
+    <!-- ------------------------------------- -->
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+    
     <style>
         /* --- THEME SETTINGS --- */
         :root {
@@ -27,6 +38,8 @@
             max-width: 700px; 
             margin: 0 auto; 
             padding: 20px; 
+            /* Prevent rubber-banding on iOS */
+            overscroll-behavior-y: none;
         }
 
         /* Header & Logo */
@@ -95,7 +108,6 @@
             font-size: 1em;
             transition: transform 0.1s, background 0.2s;
             box-shadow: 0 3px 10px rgba(255, 158, 187, 0.4);
-            /* Use inline-flex to vertically center emoji with text */
             display: inline-flex;
             align-items: center;
             gap: 8px;
@@ -103,8 +115,7 @@
         .btn-emoji {
             filter: drop-shadow(0 0 2px white) drop-shadow(0 0 4px white); 
             display: inline-block;
-            font-size: 1.1em; /* Make it slightly bigger */
-            /* small nudge to match optical baseline */
+            font-size: 1.1em; 
             transform: translateY(1px);
         }
         button.post-btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
@@ -278,14 +289,12 @@
                 
                 const deleteAction = `deletePost(${post.id}, '${post.image_url || ''}')`;
 
-                // --- UPDATED HTML BLOCK BELOW ---
                 const html = `
                     <div class="post" id="post-${post.id}">
                         ${imgHtml}
                         <div class="post-content">
                             <div class="post-header">
                                 <div class="time-badge">
-                                    <!-- ADDED NUMBER HERE -->
                                     <span style="margin-right: 8px; opacity: 0.6; font-weight: 800;">#${post.id}</span>
                                     ${fullDate} <span class="time-ago">(${relativeTime})</span>
                                 </div>
@@ -345,7 +354,6 @@
                 fileInput.value = '';
                 status.innerText = "Posted! ✨";
                 setTimeout(() => status.innerText = "", 2000);
-                // loadPosts() will be triggered by the realtime listener below
             }
             btn.disabled = false;
         }
@@ -363,7 +371,6 @@
             if (dbError) {
                 alert("Error deleting: " + dbError.message);
             } 
-            // We don't need to remove element manually, the realtime listener will refresh the list
         }
 
         function escapeHtml(text) {
@@ -372,12 +379,10 @@
         }
 
         // --- REALTIME SETUP ---
-        // This listens for any change (Insert or Delete) on the 'posts' table
         const channel = sb
             .channel('public:posts')
             .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, (payload) => {
-                console.log('Change received!', payload);
-                loadPosts(); // Refresh list automatically
+                loadPosts(); 
             })
             .subscribe();
 

@@ -85,6 +85,14 @@
             .stats-grid { grid-template-columns: 1fr; }
             .full-width { grid-column: span 1; }
         }
+        /* helpers for charts and tables */
+        .chart-wrap { height: 220px; }
+        .chart-wrap canvas { width: 100%; height: 100%; display:block; }
+        .small-card { padding: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        table th, table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(0,0,0,0.04); font-size: 0.92em; }
+        .export-btn { background: var(--accent); color: white; border-radius: 12px; padding: 8px 12px; border: none; font-weight:700; cursor:pointer; }
+        .muted { color: var(--text-meta); font-size: 0.9em; }
     </style>
 </head>
 <body>
@@ -111,22 +119,71 @@
             <div class="sub-text">Recent stalkers</div>
         </div>
 
+        <div class="card small-card">
+            <h2>Unique Visitors</h2>
+            <div class="big-num" id="uniqueVisitors" style="font-size:2em;">0</div>
+            <div class="sub-text">Unique IP addresses</div>
+        </div>
+        
+        <div class="card small-card">
+            <h2>Top Stalker</h2>
+            <div style="font-size:1.1em; margin-top:6px;" class="muted">Most frequent IP and share</div>
+            <div id="topStalker" style="margin-top:8px; font-weight:800; font-family:monospace; color:var(--text-main);">—</div>
+        </div>
+
         <!-- Line Chart -->
         <div class="card full-width">
             <h2>Traffic History 📈</h2>
-            <canvas id="trafficChart"></canvas>
+            <div class="chart-wrap"><canvas id="trafficChart"></canvas></div>
         </div>
 
         <!-- Doughnut Chart -->
         <div class="card">
             <h2>Devices 📱</h2>
-            <canvas id="deviceChart"></canvas>
+            <div class="chart-wrap"><canvas id="deviceChart"></canvas></div>
+            <div id="deviceLegend" class="muted" style="margin-top:8px;"></div>
         </div>
 
         <!-- Bar Chart -->
         <div class="card">
             <h2>Top Stalkers (IP) 🕵️‍♀️</h2>
-            <canvas id="ipChart"></canvas>
+            <div class="chart-wrap"><canvas id="ipChart"></canvas></div>
+            <div id="ipTop5List" style="margin-top:8px; font-size:0.95em; color:var(--text-meta);"></div>
+        </div>
+
+        <div class="card full-width">
+            <h2>Hourly Distribution ⏰</h2>
+            <div class="chart-wrap"><canvas id="hourlyChart"></canvas></div>
+        </div>
+
+        <div class="card">
+            <h2>Weekday Trend 📅</h2>
+            <div class="chart-wrap"><canvas id="weekdayChart"></canvas></div>
+        </div>
+
+        <div class="card">
+            <h2>Returning Customers ♻️</h2>
+            <div style="display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap;">
+                <div style="display:flex; flex-direction:column; align-items:flex-start;">
+                    <div style="font-size:1.6em; font-weight:800; color:var(--accent);" id="returningPct">--%</div>
+                </div>
+                <div style="flex:1; min-width:160px;">
+                    <div class="sub-text" style="margin:0">Percent of visitors who returned (visited &gt;1 times)</div>
+                </div>
+            </div>
+            <div style="color:var(--accent); font-size:0.85em; margin-top:8px; text-align:left;">Thanks for your patronage!</div>
+            <div id="avgVisitsPerVisitor" class="muted" style="margin-top:8px;">Avg visits per visitor: --</div>
+        </div>
+
+        <div class="card full-width">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+                <h2 style="margin:0">Recent Entries</h2>
+                <div>
+                    <button class="export-btn" id="exportCsvBtn">Export CSV</button>
+                    <span class="muted" style="margin-left:8px;">Showing latest 200 rows</span>
+                </div>
+            </div>
+            <div id="recentTableWrap" style="margin-top:10px; overflow:auto; max-height:340px;"></div>
         </div>
     </div>
 
@@ -146,6 +203,12 @@
             grey: '#e0e0e0'
         };
 
+        // small helpers
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[s]);
+        }
+
         async function initStats() {
             // 1. Fetch ALL visits
             // Note: For a huge app this is bad, for a personal site with <10k visits this is fine.
@@ -156,6 +219,8 @@
                 return;
             }
 
+            // keep rows globally for export and re-render
+            window.statRows = data || [];
             processData(data);
         }
 
@@ -197,8 +262,13 @@
             });
             // Sort and get top 5
             const sortedIps = Object.entries(ips).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            // Unique visitors count
+            const uniqueCount = Object.keys(ips).length;
+            document.getElementById('uniqueVisitors').innerText = uniqueCount;
 
             renderCharts(visitsByDate, devices, sortedIps);
+                // build recent entries table
+                renderRecentEntries(data.slice().reverse().slice(0,200));
         }
 
         function renderCharts(dateData, deviceData, ipData) {
@@ -233,8 +303,11 @@
                         borderWidth: 0
                     }]
                 },
-                options: { responsive: true }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
             });
+
+            // device legend & percentages
+            if (typeof renderDeviceLegend === 'function') renderDeviceLegend(deviceData);
 
             // 3. Bar Chart
             new Chart(document.getElementById('ipChart'), {
@@ -254,6 +327,162 @@
                     scales: { y: { beginAtZero: true } }
                 }
             });
+
+            // render additional charts & small cards using full rows if available
+            const rows = window.statRows || [];
+            if (typeof renderHourlyChart === 'function') renderHourlyChart(rows);
+            if (typeof renderWeekdayChart === 'function') renderWeekdayChart(rows);
+            if (typeof renderReturningVisitors === 'function') renderReturningVisitors(rows);
+            if (typeof renderTopStalker === 'function') renderTopStalker(rows);
+            // device legend was already rendered above
+        }
+
+        // safe chart destroyer
+        function safeDestroy(chartVarName) {
+            try {
+                const c = window[chartVarName];
+                if (c && typeof c.destroy === 'function') c.destroy();
+            } catch (e) { /* ignore */ }
+            window[chartVarName] = null;
+        }
+
+        function renderHourlyChart(rows) {
+            safeDestroy('hourlyChartObj');
+            const hours = new Array(24).fill(0);
+            rows.forEach(r => {
+                const d = new Date(r.created_at);
+                if (!isNaN(d)) hours[d.getHours()]++;
+            });
+            const ctx = document.getElementById('hourlyChart');
+            window.hourlyChartObj = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: hours.map((_,i)=>String(i)), datasets: [{ label: 'Visits by hour', data: hours, backgroundColor: colors.blue }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        function renderWeekdayChart(rows) {
+            safeDestroy('weekdayChartObj');
+            const days = new Array(7).fill(0); // 0=Sun .. 6=Sat
+            rows.forEach(r => {
+                const d = new Date(r.created_at);
+                if (!isNaN(d)) days[d.getDay()]++;
+            });
+            const labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+            const ctx = document.getElementById('weekdayChart');
+            window.weekdayChartObj = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets: [{ label: 'Visits', data: days, borderColor: colors.purple, backgroundColor: 'rgba(206,147,216,0.15)', fill:true, tension:0.3 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero:true } } }
+            });
+        }
+
+        // device legend renderer (shows counts + percentages)
+        function renderDeviceLegend(deviceData) {
+            const el = document.getElementById('deviceLegend');
+            if (!el) return;
+            const labels = Object.keys(deviceData);
+            const vals = Object.values(deviceData);
+            const total = vals.reduce((s,v)=>s+v,0) || 0;
+            if (total === 0) { el.innerHTML = '<div class="muted">No device data</div>'; return; }
+            const parts = labels.map((lab,i)=>{
+                const count = vals[i]||0;
+                const pct = ((count/total)*100);
+                const color = ['#ff9ebb','#a5d6a7','#90caf9','#ce93d8','#e0e0e0'][i] || '#ddd';
+                return `<div style="display:flex; align-items:center; gap:8px; margin-top:6px;"><span style="width:10px; height:10px; background:${color}; border-radius:50%; display:inline-block;"></span><strong style="width:90px">${lab}</strong><span>${count} (${pct.toFixed(1)}%)</span></div>`;
+            });
+            el.innerHTML = parts.join('');
+        }
+
+        // returning visitors percentage (IPs seen >1 times)
+        function renderReturningVisitors(rows) {
+            const el = document.getElementById('returningPct');
+            if (!el) return;
+            if (!rows || rows.length === 0) { el.innerText = '--%'; return; }
+            const counts = {};
+            rows.forEach(r=>{ const ip = r.ip||'Unknown'; counts[ip]=(counts[ip]||0)+1; });
+            const unique = Object.keys(counts).length;
+            const returning = Object.values(counts).filter(c=>c>1).length;
+            const pct = unique === 0 ? 0 : (returning/unique)*100;
+            el.innerText = `${pct.toFixed(1)}%`;
+            // average visits per unique visitor
+            const avgEl = document.getElementById('avgVisitsPerVisitor');
+            const total = rows.length || 0;
+            if (avgEl) {
+                const avg = unique === 0 ? '--' : (total/unique).toFixed(2);
+                avgEl.innerText = `Avg visits per visitor: ${avg}`;
+            }
+        }
+
+        // top stalker small card
+        function renderTopStalker(rows) {
+            const el = document.getElementById('topStalker');
+            if (!el) return;
+            if (!rows || rows.length === 0) { el.innerText = '—'; return; }
+            const counts = {};
+            rows.forEach(r=>{ const ip = r.ip||'Unknown'; counts[ip]=(counts[ip]||0)+1; });
+            const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+            const top = entries[0];
+            const total = rows.length;
+            if (!top) { el.innerText = '—'; return; }
+            const pct = ((top[1]/total)*100).toFixed(1);
+            el.innerHTML = `
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+                    <div style="font-size:1.05em;">${escapeHtml(top[0])}</div>
+                    <div style="background:var(--accent); color:white; padding:6px 10px; border-radius:12px; font-weight:700;">${pct}%</div>
+                </div>
+                <div class="muted" style="font-size:0.9em; margin-top:6px;">${top[1]} visits — ${pct}% of total</div>
+            `;
+
+            // build top-5 list under IP chart
+            const listEl = document.getElementById('ipTop5List');
+            if (listEl) {
+                const top5 = entries.slice(0,5);
+                const html = top5.map((t, idx) => {
+                    const ip = escapeHtml(t[0]);
+                    const count = t[1];
+                    const p = ((count/total)*100).toFixed(1);
+                    return `<div style="display:flex; justify-content:space-between; gap:10px; padding:4px 0;"><div style="color:var(--text-main)">${idx+1}. <code style=\"font-family:monospace\">${ip}</code></div><div class=\"muted\">${count} (${p}%)</div></div>`;
+                }).join('');
+                listEl.innerHTML = html;
+            }
+        }
+
+        // wire export button
+        document.addEventListener('DOMContentLoaded', () => {
+            const btn = document.getElementById('exportCsvBtn');
+            if (btn) btn.addEventListener('click', () => exportCsv(window.statRows || []));
+        });
+
+        // Recent entries renderer
+        function renderRecentEntries(rows) {
+            const wrap = document.getElementById('recentTableWrap');
+            if (!wrap) return;
+            if (!rows || rows.length === 0) { wrap.innerHTML = '<div class="muted">No recent entries</div>'; return; }
+            let html = '<table><thead><tr><th>Time</th><th>IP</th><th>UA</th></tr></thead><tbody>';
+            rows.forEach(r => {
+                const d = new Date(r.created_at).toLocaleString();
+                const ip = r.ip || 'Unknown';
+                const ua = (r.ua || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                html += `<tr><td>${d}</td><td><code style="font-family:monospace">${ip}</code></td><td>${ua}</td></tr>`;
+            });
+            html += '</tbody></table>';
+            wrap.innerHTML = html;
+        }
+
+        // Export CSV
+        function exportCsv(rows) {
+            if (!rows || rows.length === 0) return alert('No rows to export');
+            const header = ['id','ip','ua','created_at'];
+            const lines = [header.join(',')];
+            rows.forEach(r => {
+                const line = [r.id||'', '"'+(r.ip||'')+'"', '"'+(r.ua||'')+'"', '"'+(r.created_at||'')+'"'].join(',');
+                lines.push(line);
+            });
+            const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'visits_export.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
         }
 
         initStats();

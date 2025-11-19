@@ -13,6 +13,7 @@
     <link rel="apple-touch-icon" href="https://bxuupwldlyemividzjei.supabase.co/storage/v1/object/public/uploads/logo.png">
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code&display=swap" rel="stylesheet"> <!-- Font for IP -->
     
@@ -248,9 +249,13 @@
         .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20000; }
         .modal[aria-hidden="false"] { display: flex; }
         .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(2px); }
-    .modal-content { position: relative; background: var(--card-bg); border-radius: 14px; padding: 18px; width: min(820px, 96%); max-height: 90vh; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.12); border: 1px solid rgba(255,255,255,0.92); }
+    .modal-content { position: relative; background: var(--card-bg); border-radius: 14px; padding: 18px; width: min(820px, 96%); max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.12); border: 1px solid rgba(255,255,255,0.92); }
         .modal-close { position: absolute; right: 8px; top: 8px; background: none; border: none; font-size: 1.4em; cursor: pointer; color: var(--text-meta); }
-        #diary-list { margin-top: 8px; color: var(--text-main); }
+    #diary-list { margin-top: 8px; color: var(--text-main); }
+    /* Make diary scrollable inside modal */
+    #diary-view { max-height: 62vh; overflow: auto; padding-right: 6px; }
+    /* Stats view scroll area */
+    #stats-view { max-height: 62vh; overflow: auto; padding-right: 6px; }
         .diary-entry { padding: 8px 10px; border-radius: 10px; background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,245,249,0.98)); margin-bottom: 8px; border: 1px solid var(--border); display:flex; gap:10px; align-items:center; }
         .diary-entry .d-time { font-size: 0.85em; color: var(--text-meta); margin-left: auto; }
         .diary-entry .d-ip { font-family: 'Fira Code', monospace; font-size: 0.85em; padding: 6px 8px; border-radius: 8px; }
@@ -259,6 +264,24 @@
     .tab-btn { padding:6px 10px; border-radius:999px; background:transparent; border:1px solid rgba(0,0,0,0.04); color:var(--text-meta); font-weight:700; cursor:pointer; }
     .tab-btn.active { background: var(--accent); color: white; border-color: transparent; }
     #stats-iframe { width:100%; height:60vh; border: none; border-radius: 8px; display:block; }
+    /* Chart container sizing: use wrapper so Chart.js can draw without CSS distortion */
+    .chart-wrap { height: 240px; }
+    .chart-wrap canvas { width: 100%; height: 100%; display: block; }
+    /* Ensure small screens keep layout usable */
+    @media (max-width: 520px) { .chart-wrap { height: 180px; } }
+    /* Inline stats card styles (used in modal) */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .card { background: var(--card-bg); padding: 14px; border-radius: 12px; box-shadow: 0 6px 20px rgba(255,158,187,0.08); border: 1px solid white; }
+    .full-width { grid-column: span 2; }
+    h2 { margin-top: 0; font-size: 0.95em; color: var(--text-meta); text-transform: uppercase; letter-spacing: 1px; }
+    .big-num { font-size: 2.4em; font-weight: 800; color: var(--accent); }
+    .sub-text { font-size: 0.85em; color: var(--text-meta); }
+    #modal-loading { text-align:center; padding: 18px; color: var(--text-meta); }
+
+    @media (max-width: 600px) {
+        .stats-grid { grid-template-columns: 1fr; }
+        .full-width { grid-column: span 1; }
+    }
     </style>
 </head>
 <body>
@@ -303,19 +326,54 @@
         <div class="modal-backdrop" onclick="closeDiary()"></div>
         <div class="modal-content">
             <button class="modal-close" onclick="closeDiary()" aria-label="Close diary">×</button>
-            <h3 id="maid-diary-title" style="margin:0 0 8px 0; color:var(--accent-hover);">Maid Diary ✨</h3>
+            <h3 id="maid-diary-title" style="margin:0 0 8px 0; color:var(--accent-hover);">Maid Diary 🌙</h3>
 
-            <div class="modal-tabs" role="tablist" aria-label="Diary and Stats tabs">
+            <div class="modal-tabs" role="tablist" aria-label="Diary and    s tabs">
                 <button id="tab-diary" class="tab-btn" role="tab" aria-selected="false" onclick="switchToDiary()">Diary</button>
                 <button id="tab-stats" class="tab-btn active" role="tab" aria-selected="true" onclick="switchToStats()">Stats</button>
+            </div>
+
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+                <button class="tab-btn" style="padding:6px 12px;" onclick="window.open('stat.html','_blank')">See detailed info</button>
+                <div style="font-size:0.85em; color:var(--text-meta);">Open full stats in a separate page</div>
             </div>
 
             <div id="diary-view">
                 <div id="diary-list">Loading...</div>
             </div>
 
-            <!-- Embed the detailed stats page (lazy-loaded) -->
-            <iframe id="stats-iframe" src="" title="Visitor Analytics" style="display:block; margin-top:8px;"></iframe>
+            <!-- Inline Stats view (was iframe) -->
+            <div id="stats-view" style="display:block; margin-top:8px;">
+                <div id="modal-loading">Calculating cuteness... 🐇</div>
+
+                <div id="modal-dashboard" class="stats-grid" style="display:none; gap:12px;">
+                    <div class="card">
+                        <h2>Total Visits</h2>
+                        <div class="big-num" id="modalTotalVisits">0</div>
+                        <div class="sub-text">All time hits</div>
+                    </div>
+                    <div class="card">
+                        <h2>Last 24 Hours</h2>
+                        <div class="big-num" id="modalTodayVisits" style="color: #a8909c">0</div>
+                        <div class="sub-text">Recent stalkers</div>
+                    </div>
+
+                        <div class="card full-width">
+                            <h2>Traffic History 📈</h2>
+                            <div class="chart-wrap"><canvas id="modalTrafficChart"></canvas></div>
+                        </div>
+
+                        <div class="card">
+                            <h2>Devices 📱</h2>
+                            <div class="chart-wrap"><canvas id="modalDeviceChart"></canvas></div>
+                        </div>
+
+                        <div class="card">
+                            <h2>Top Stalkers (IP) 🕵️‍♀️</h2>
+                            <div class="chart-wrap"><canvas id="modalIpChart"></canvas></div>
+                        </div>
+                </div>
+            </div>
 
         </div>
     </div>
@@ -449,32 +507,129 @@
             }
         }
 
-        // Tab switching: Diary <-> Stats (stat.html)
+        // Tab switching: Diary <-> Stats (inline modal charts)
+        let modalStatsInitialized = false;
+        let modalTrafficChart = null;
+        let modalDeviceChart = null;
+        let modalIpChart = null;
+
         function switchToStats() {
-            const iframe = document.getElementById('stats-iframe');
             const diaryTab = document.getElementById('tab-diary');
             const statsTab = document.getElementById('tab-stats');
             const diaryView = document.getElementById('diary-view');
-            if (!iframe) return;
-            // lazy-load the stats page only when requested
-            if (!iframe.src) iframe.src = 'stat.html';
-            iframe.style.display = 'block';
+            const statsView = document.getElementById('stats-view');
+            if (!statsView) return;
+            statsView.style.display = 'block';
             diaryView.style.display = 'none';
             if (statsTab && diaryTab) { statsTab.classList.add('active'); diaryTab.classList.remove('active'); statsTab.setAttribute('aria-selected', 'true'); diaryTab.setAttribute('aria-selected', 'false'); }
+            if (!modalStatsInitialized) {
+                modalStatsInitialized = true;
+                initModalStats();
+            }
         }
 
         function switchToDiary() {
-            const iframe = document.getElementById('stats-iframe');
             const diaryTab = document.getElementById('tab-diary');
             const statsTab = document.getElementById('tab-stats');
             const diaryView = document.getElementById('diary-view');
+            const statsView = document.getElementById('stats-view');
             const listEl = document.getElementById('diary-list');
             if (!diaryView) return;
-            iframe.style.display = 'none';
+            if (statsView) statsView.style.display = 'none';
             diaryView.style.display = 'block';
             if (statsTab && diaryTab) { statsTab.classList.remove('active'); diaryTab.classList.add('active'); statsTab.setAttribute('aria-selected', 'false'); diaryTab.setAttribute('aria-selected', 'true'); }
             // refresh entries
             if (listEl) loadDiaryEntries();
+        }
+
+        // Initialize stats inside modal: fetch visits and render charts
+        async function initModalStats() {
+            const loading = document.getElementById('modal-loading');
+            const dashboard = document.getElementById('modal-dashboard');
+            if (loading) loading.style.display = 'block';
+            if (dashboard) dashboard.style.display = 'none';
+
+            try {
+                const { data, error } = await sb.from('visits').select('*').order('created_at', { ascending: true });
+                if (error) {
+                    if (loading) loading.textContent = 'Error loading stats';
+                    console.warn('modal stats load error', error);
+                    return;
+                }
+                processModalStats(data || []);
+            } catch (e) {
+                console.warn('modal stats exception', e);
+                if (loading) loading.textContent = 'Error loading stats';
+            }
+        }
+
+        function processModalStats(data) {
+            const loading = document.getElementById('modal-loading');
+            const dashboard = document.getElementById('modal-dashboard');
+            if (loading) loading.style.display = 'none';
+            if (dashboard) dashboard.style.display = 'grid';
+
+            const total = data.length;
+            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const todayCount = data.filter(v => new Date(v.created_at) > oneDayAgo).length;
+            document.getElementById('modalTotalVisits').innerText = total;
+            document.getElementById('modalTodayVisits').innerText = todayCount;
+
+            // Visits by date
+            const visitsByDate = {};
+            data.forEach(v => {
+                const date = new Date(v.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                visitsByDate[date] = (visitsByDate[date] || 0) + 1;
+            });
+
+            // Devices
+            const devices = { 'iPhone': 0, 'Android': 0, 'Windows': 0, 'Mac': 0, 'Other': 0 };
+            data.forEach(v => {
+                const ua = (v.ua || '').toLowerCase();
+                if (ua.includes('iphone')) devices['iPhone']++;
+                else if (ua.includes('android')) devices['Android']++;
+                else if (ua.includes('windows')) devices['Windows']++;
+                else if (ua.includes('mac os')) devices['Mac']++;
+                else devices['Other']++;
+            });
+
+            // Top IPs
+            const ips = {};
+            data.forEach(v => { const ip = v.ip || 'Unknown'; ips[ip] = (ips[ip] || 0) + 1; });
+            const sortedIps = Object.entries(ips).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+            renderModalCharts(visitsByDate, devices, sortedIps);
+        }
+
+        function renderModalCharts(dateData, deviceData, ipData) {
+            // Destroy previous charts if present
+            if (modalTrafficChart) { modalTrafficChart.destroy(); modalTrafficChart = null; }
+            if (modalDeviceChart) { modalDeviceChart.destroy(); modalDeviceChart = null; }
+            if (modalIpChart) { modalIpChart.destroy(); modalIpChart = null; }
+
+            Chart.defaults.font.family = "'Quicksand', sans-serif";
+            Chart.defaults.color = '#a8909c';
+
+            const trafficCtx = document.getElementById('modalTrafficChart').getContext('2d');
+            modalTrafficChart = new Chart(trafficCtx, {
+                type: 'line',
+                data: { labels: Object.keys(dateData), datasets: [{ label: 'Visits', data: Object.values(dateData), borderColor: '#ff9ebb', backgroundColor: 'rgba(255,158,187,0.2)', fill:true, tension:0.4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            const deviceCtx = document.getElementById('modalDeviceChart').getContext('2d');
+            modalDeviceChart = new Chart(deviceCtx, {
+                type: 'doughnut',
+                data: { labels: Object.keys(deviceData), datasets: [{ data: Object.values(deviceData), backgroundColor: ['#ff9ebb','#a5d6a7','#90caf9','#ce93d8','#e0e0e0'], borderWidth:0 }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            const ipCtx = document.getElementById('modalIpChart').getContext('2d');
+            modalIpChart = new Chart(ipCtx, {
+                type: 'bar',
+                data: { labels: ipData.map(i=>i[0]), datasets: [{ label:'Visits', data: ipData.map(i=>i[1]), backgroundColor: ['#90caf9','#ce93d8','#ff9ebb','#a5d6a7','#fff59d'], borderRadius:5 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
         }
 
         // Fetch and display total visit count

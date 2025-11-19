@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stats 🌸</title>
+    
+    <!-- iOS Settings -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#ffeef5">
+
+    <!-- Libraries: Supabase + Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #ffeef5;
+            --card-bg: #ffffff;
+            --text-main: #5d4d55;
+            --text-meta: #a8909c;
+            --accent: #ff9ebb;
+            --border: #fce4ec;
+        }
+
+        body { 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            font-family: 'Quicksand', sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px;
+        }
+
+        /* Header */
+        .nav-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .back-btn {
+            text-decoration: none;
+            background: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 700;
+            color: var(--text-meta);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: 0.2s;
+        }
+        .back-btn:hover { transform: translateX(-3px); color: var(--accent); }
+        
+        h1 { margin-left: 15px; font-size: 1.5em; color: var(--text-main); }
+
+        /* Grid Layout */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 5px 15px rgba(255, 158, 187, 0.15);
+            border: 1px solid white;
+        }
+        
+        .full-width { grid-column: span 2; }
+
+        h2 { margin-top: 0; font-size: 1em; color: var(--text-meta); text-transform: uppercase; letter-spacing: 1px; }
+        
+        /* Big Number */
+        .big-num { font-size: 3em; font-weight: 800; color: var(--accent); }
+        .sub-text { font-size: 0.9em; color: var(--text-meta); }
+
+        /* Loading State */
+        #loading { text-align: center; padding: 50px; color: var(--text-meta); }
+
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .full-width { grid-column: span 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="nav-header">
+        <a href="index.html" class="back-btn">← Back</a>
+        <h1>Visitor Analytics 📊</h1>
+    </div>
+
+    <div id="loading">Calculating cuteness... 🐇</div>
+
+    <div id="dashboard" class="stats-grid" style="display:none;">
+        
+        <!-- Summary Cards -->
+        <div class="card">
+            <h2>Total Visits</h2>
+            <div class="big-num" id="totalVisits">0</div>
+            <div class="sub-text">All time hits</div>
+        </div>
+
+        <div class="card">
+            <h2>Last 24 Hours</h2>
+            <div class="big-num" id="todayVisits" style="color: #a8909c">0</div>
+            <div class="sub-text">Recent stalkers</div>
+        </div>
+
+        <!-- Line Chart -->
+        <div class="card full-width">
+            <h2>Traffic History 📈</h2>
+            <canvas id="trafficChart"></canvas>
+        </div>
+
+        <!-- Doughnut Chart -->
+        <div class="card">
+            <h2>Devices 📱</h2>
+            <canvas id="deviceChart"></canvas>
+        </div>
+
+        <!-- Bar Chart -->
+        <div class="card">
+            <h2>Top Stalkers (IP) 🕵️‍♀️</h2>
+            <canvas id="ipChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION (SAME AS INDEX) ---
+        const SUPABASE_URL = 'https://bxuupwldlyemividzjei.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4dXVwd2xkbHllbWl2aWR6amVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM1NjI1MjMsImV4cCI6MjA3OTEzODUyM30.QpHh8VIfskWW6oe7lIhjz0xo9Mf7Ed_o-A0w5wLI21w';
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Pastel Palette
+        const colors = {
+            pink: '#ff9ebb',
+            blue: '#90caf9',
+            purple: '#ce93d8',
+            yellow: '#fff59d',
+            green: '#a5d6a7',
+            grey: '#e0e0e0'
+        };
+
+        async function initStats() {
+            // 1. Fetch ALL visits
+            // Note: For a huge app this is bad, for a personal site with <10k visits this is fine.
+            const { data, error } = await sb.from('visits').select('*').order('created_at', { ascending: true });
+            
+            if (error) {
+                alert("Error loading stats");
+                return;
+            }
+
+            processData(data);
+        }
+
+        function processData(data) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'grid';
+
+            // --- 1. Summary Counts ---
+            const total = data.length;
+            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const todayCount = data.filter(v => new Date(v.created_at) > oneDayAgo).length;
+
+            document.getElementById('totalVisits').innerText = total;
+            document.getElementById('todayVisits').innerText = todayCount;
+
+            // --- 2. Traffic Over Time (Group by Date) ---
+            const visitsByDate = {};
+            data.forEach(v => {
+                const date = new Date(v.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                visitsByDate[date] = (visitsByDate[date] || 0) + 1;
+            });
+
+            // --- 3. Devices (Parse User Agent) ---
+            const devices = { 'iPhone': 0, 'Android': 0, 'Windows': 0, 'Mac': 0, 'Other': 0 };
+            data.forEach(v => {
+                const ua = (v.ua || '').toLowerCase();
+                if (ua.includes('iphone')) devices['iPhone']++;
+                else if (ua.includes('android')) devices['Android']++;
+                else if (ua.includes('windows')) devices['Windows']++;
+                else if (ua.includes('mac os')) devices['Mac']++;
+                else devices['Other']++;
+            });
+
+            // --- 4. Top IPs ---
+            const ips = {};
+            data.forEach(v => {
+                const ip = v.ip || 'Unknown';
+                ips[ip] = (ips[ip] || 0) + 1;
+            });
+            // Sort and get top 5
+            const sortedIps = Object.entries(ips).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+            renderCharts(visitsByDate, devices, sortedIps);
+        }
+
+        function renderCharts(dateData, deviceData, ipData) {
+            Chart.defaults.font.family = "'Quicksand', sans-serif";
+            Chart.defaults.color = '#a8909c';
+
+            // 1. Line Chart
+            new Chart(document.getElementById('trafficChart'), {
+                type: 'line',
+                data: {
+                    labels: Object.keys(dateData),
+                    datasets: [{
+                        label: 'Visits',
+                        data: Object.values(dateData),
+                        borderColor: colors.pink,
+                        backgroundColor: 'rgba(255, 158, 187, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+
+            // 2. Doughnut Chart
+            new Chart(document.getElementById('deviceChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(deviceData),
+                    datasets: [{
+                        data: Object.values(deviceData),
+                        backgroundColor: [colors.pink, colors.green, colors.blue, colors.purple, colors.grey],
+                        borderWidth: 0
+                    }]
+                },
+                options: { responsive: true }
+            });
+
+            // 3. Bar Chart
+            new Chart(document.getElementById('ipChart'), {
+                type: 'bar',
+                data: {
+                    labels: ipData.map(i => i[0]), // IP addresses
+                    datasets: [{
+                        label: 'Visits',
+                        data: ipData.map(i => i[1]), // Counts
+                        backgroundColor: [colors.blue, colors.purple, colors.pink, colors.green, colors.yellow],
+                        borderRadius: 5
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        initStats();
+    </script>
+</body>
+</html>

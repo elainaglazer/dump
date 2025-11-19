@@ -93,7 +93,11 @@
             font-weight: 700;
             z-index: 10001;
             pointer-events: auto;
+            cursor: pointer;
         }
+
+        #visit-count .visit-main { font-weight: 800; color: var(--text-main); }
+        #visit-count .visit-sub { font-size: 0.72em; color: var(--text-meta); margin-top: 2px; font-weight: 600; }
 
         /* Hide the fixed visit pill on very small screens where it may still obstruct */
         @media (max-width: 420px) {
@@ -107,6 +111,7 @@
                 opacity: 0.95;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.06);
             }
+            #visit-count .visit-sub { display: none; }
         }
 
         /* Top-center banner for non-blocking admin notification */
@@ -239,6 +244,16 @@
             .post-img img { max-width: 100%; max-height: 300px; }
             .header-container { justify-content: center; }
         }
+        /* Modal / Diary styles */
+        .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20000; }
+        .modal[aria-hidden="false"] { display: flex; }
+        .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(2px); }
+        .modal-content { position: relative; background: var(--card-bg); border-radius: 14px; padding: 18px; width: min(620px, 94%); max-height: 80vh; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.12); border: 1px solid rgba(255,255,255,0.92); }
+        .modal-close { position: absolute; right: 8px; top: 8px; background: none; border: none; font-size: 1.4em; cursor: pointer; color: var(--text-meta); }
+        #diary-list { margin-top: 8px; color: var(--text-main); }
+        .diary-entry { padding: 8px 10px; border-radius: 10px; background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,245,249,0.98)); margin-bottom: 8px; border: 1px solid var(--border); display:flex; gap:10px; align-items:center; }
+        .diary-entry .d-time { font-size: 0.85em; color: var(--text-meta); margin-left: auto; }
+        .diary-entry .d-ip { font-family: 'Fira Code', monospace; font-size: 0.85em; padding: 6px 8px; border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -254,7 +269,10 @@
         <div class="admin-indicator">
             ✨ ADMIN MODE ACTIVE ✨
         </div>
-        <div id="visit-count" title="Total visits">Visits: —</div>
+        <div id="visit-count" title="Total visits" role="button" tabindex="0" aria-haspopup="dialog" aria-controls="maid-diary-modal">
+            <div class="visit-main">Visits: —</div>
+            <div class="visit-sub">Maid Diary</div>
+        </div>
     </div>
 
     <!-- Non-blocking top banner (hidden by default) -->
@@ -273,6 +291,16 @@
 
     <div id="feed">
         <div style="text-align:center; color: var(--text-meta); margin-top: 40px;">Loading posts... 🐇</div>
+    </div>
+
+    <!-- Maid Diary Modal -->
+    <div id="maid-diary-modal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="maid-diary-title">
+        <div class="modal-backdrop" onclick="closeDiary()"></div>
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeDiary()" aria-label="Close diary">×</button>
+            <h3 id="maid-diary-title" style="margin:0 0 8px 0; color:var(--accent-hover);">Maid Diary ✨</h3>
+            <div id="diary-list">Loading...</div>
+        </div>
     </div>
 
     <script>
@@ -354,21 +382,73 @@
             }
         }
 
+        // Maid Diary: open/close and load entries
+        function openDiary() {
+            const modal = document.getElementById('maid-diary-modal');
+            if (!modal) return;
+            modal.setAttribute('aria-hidden', 'false');
+            // Load entries when opened
+            loadDiaryEntries();
+        }
+
+        function closeDiary() {
+            const modal = document.getElementById('maid-diary-modal');
+            if (!modal) return;
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        async function loadDiaryEntries() {
+            const listEl = document.getElementById('diary-list');
+            if (!listEl) return;
+            listEl.innerHTML = 'Loading...';
+            try {
+                const { data, error } = await sb.from('visits').select('*').order('created_at', { ascending: false }).limit(200);
+                if (error) {
+                    listEl.innerHTML = `<div style="color:var(--accent-hover)">Error loading diary: ${error.message}</div>`;
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    listEl.innerHTML = `<div style="color:var(--text-meta)">No diary entries yet. Be the first visitor! ✨</div>`;
+                    return;
+                }
+
+                // Render entries
+                listEl.innerHTML = '';
+                data.forEach(v => {
+                    const d = new Date(v.created_at);
+                    const full = d.toLocaleString();
+                    const rel = timeAgo(d);
+                    const pal = ipPalette(v.ip);
+                    const ipHtml = v.ip ? `<span class="d-ip" style="background:${pal.bg}; color:${pal.text};">${v.ip}</span>` : '';
+                    const entry = document.createElement('div');
+                    entry.className = 'diary-entry';
+                    entry.innerHTML = `<div>${ipHtml}</div><div style="font-size:0.95em; color:var(--text-main);">Visited</div><div class="d-time">${full} · ${rel}</div>`;
+                    listEl.appendChild(entry);
+                });
+            } catch (e) {
+                console.warn('Diary load error', e);
+                listEl.innerHTML = `<div style="color:var(--accent-hover)">Error loading diary.</div>`;
+            }
+        }
+
         // Fetch and display total visit count
         async function fetchVisitCount() {
             const visitEl = document.getElementById('visit-count');
             if (!visitEl) return;
             try {
-                const { count, error } = await sb.from('visits').select('*', { head: true, count: 'exact' });
-                if (error) {
-                    console.warn('visit count error', error.message || error);
-                    visitEl.textContent = 'Visits: —';
-                } else {
-                    visitEl.textContent = `Visits: ${count ?? '0'}`;
-                }
+                    const { count, error } = await sb.from('visits').select('*', { head: true, count: 'exact' });
+                    const main = visitEl.querySelector('.visit-main');
+                    if (error) {
+                        console.warn('visit count error', error.message || error);
+                        if (main) main.textContent = 'Visits: —'; else visitEl.textContent = 'Visits: —';
+                    } else {
+                        if (main) main.textContent = `Visits: ${count ?? '0'}`; else visitEl.textContent = `Visits: ${count ?? '0'}`;
+                    }
             } catch (e) {
                 console.warn('visit count exception', e);
-                visitEl.textContent = 'Visits: —';
+                    const main = visitEl.querySelector('.visit-main');
+                    if (main) main.textContent = 'Visits: —'; else visitEl.textContent = 'Visits: —';
             }
         }
 
@@ -598,6 +678,13 @@
                 fetchVisitCount();
             })
             .subscribe();
+
+        // Make the visit pill open the Maid Diary
+        const visitBtn = document.getElementById('visit-count');
+        if (visitBtn) {
+            visitBtn.addEventListener('click', openDiary);
+            visitBtn.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDiary(); } });
+        }
 
         // Initial Load
         // Start: record visit then load posts

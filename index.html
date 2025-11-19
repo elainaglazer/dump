@@ -97,7 +97,16 @@
 
         /* Hide the fixed visit pill on very small screens where it may still obstruct */
         @media (max-width: 420px) {
-            #visit-count { display: none; }
+            /* Move to bottom-right, smaller and semi-transparent on small screens */
+            #visit-count {
+                top: auto;
+                right: 12px;
+                bottom: 12px;
+                font-size: 0.75em;
+                padding: 3px 6px;
+                opacity: 0.95;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            }
         }
 
         /* Top-center banner for non-blocking admin notification */
@@ -338,6 +347,18 @@
 
             // Fetch total count (uses head:true + count:'exact' to avoid returning rows)
             try {
+                await fetchVisitCount();
+            } catch (e) {
+                console.warn('visit count exception', e);
+                visitEl.textContent = 'Visits: —';
+            }
+        }
+
+        // Fetch and display total visit count
+        async function fetchVisitCount() {
+            const visitEl = document.getElementById('visit-count');
+            if (!visitEl) return;
+            try {
                 const { count, error } = await sb.from('visits').select('*', { head: true, count: 'exact' });
                 if (error) {
                     console.warn('visit count error', error.message || error);
@@ -561,10 +582,20 @@
         }
 
         // --- REALTIME SETUP ---
+        // Posts realtime channel (unchanged)
         const channel = sb
             .channel('public:posts')
             .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, (payload) => {
                 loadPosts(); 
+            })
+            .subscribe();
+
+        // Visits realtime channel - update visit counter live on insert/delete
+        const visitsChannel = sb
+            .channel('public:visits')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, (payload) => {
+                // For low traffic this is lightweight: just refresh the count on any change
+                fetchVisitCount();
             })
             .subscribe();
 

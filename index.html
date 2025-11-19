@@ -11,7 +11,7 @@
         :root {
             --bg-color: #ffeef5;        /* Light Pink Background */
             --card-bg: #ffffff;         /* White Post Background */
-            --text-main: #5d4d55;       /* Soft Brown/Grey Text (Darker for readability) */
+            --text-main: #5d4d55;       /* Soft Brown/Grey Text */
             --text-meta: #a8909c;       /* Lighter Meta Text */
             --accent: #ff9ebb;          /* Cute Pink Accent */
             --accent-hover: #ff7da3;    /* Darker Pink for Hover */
@@ -127,7 +127,7 @@
         
         .post-content { flex-grow: 1; min-width: 0; } 
         
-        /* Header inside post (Time + Delete) */
+        /* Header inside post */
         .post-header {
             display: flex;
             justify-content: space-between;
@@ -135,7 +135,6 @@
             margin-bottom: 10px;
         }
 
-        /* The Time Badge - Makes it stand out! */
         .time-badge {
             background-color: var(--time-badge-bg);
             color: var(--time-badge-text);
@@ -210,8 +209,9 @@
         const bucketName = 'uploads';
         const tableName = 'posts';
 
+        // Load Logo
         const logoEl = document.getElementById('siteLogo');
-        logoEl.onload = function() { this.style.display = 'block'; }; // Show when loaded
+        logoEl.onload = function() { this.style.display = 'block'; }; 
         logoEl.src = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/logo.png`;
 
         // Time Ago Logic
@@ -239,8 +239,9 @@
                 .order('created_at', { ascending: false });
 
             const feed = document.getElementById('feed');
-            feed.innerHTML = '';
-
+            // Note: We don't clear innerHTML immediately here to prevent flickering
+            // But for simplicity in this logic, we will just overwrite it.
+            
             if (error) {
                 console.error(error);
                 feed.innerHTML = `<div style="color:var(--accent-hover); text-align:center;">Opps! Error: ${error.message}</div>`;
@@ -252,19 +253,15 @@
                 return;
             }
 
+            // Clear feed only before rebuilding to minimize flash
+            feed.innerHTML = ''; 
+
             data.forEach(post => {
                 const dateObj = new Date(post.created_at);
                 
-                // 1. Full Date with Year
                 const fullDate = dateObj.toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: 'numeric', 
-                    minute: 'numeric' 
+                    year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' 
                 });
-
-                // 2. Relative Time
                 const relativeTime = timeAgo(dateObj);
                 
                 let imgHtml = post.image_url ? 
@@ -299,7 +296,7 @@
             const text = textInput.value;
             const file = fileInput.files[0];
 
-            if (!text && !file) return alert("Please type something or add a cute picture! 🌸");
+            if (!text && !file) return alert("Please type something! 🌸");
 
             btn.disabled = true;
             status.innerText = "Uploading... ☁️";
@@ -336,7 +333,7 @@
                 fileInput.value = '';
                 status.innerText = "Posted! ✨";
                 setTimeout(() => status.innerText = "", 2000);
-                loadPosts();
+                // loadPosts() will be triggered by the realtime listener below
             }
             btn.disabled = false;
         }
@@ -353,13 +350,8 @@
 
             if (dbError) {
                 alert("Error deleting: " + dbError.message);
-            } else {
-                const el = document.getElementById(`post-${id}`);
-                if (el) {
-                    el.style.opacity = '0';
-                    setTimeout(() => el.remove(), 300);
-                }
-            }
+            } 
+            // We don't need to remove element manually, the realtime listener will refresh the list
         }
 
         function escapeHtml(text) {
@@ -367,6 +359,17 @@
             return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
 
+        // --- REALTIME SETUP ---
+        // This listens for any change (Insert or Delete) on the 'posts' table
+        const channel = sb
+            .channel('public:posts')
+            .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, (payload) => {
+                console.log('Change received!', payload);
+                loadPosts(); // Refresh list automatically
+            })
+            .subscribe();
+
+        // Initial Load
         loadPosts();
     </script>
 </body>

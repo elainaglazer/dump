@@ -5,23 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Dump</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         /* --- THEME SETTINGS --- */
         :root {
             --bg-color: #ffeef5;        /* Light Pink Background */
             --card-bg: #ffffff;         /* White Post Background */
-            --text-main: #6b5b65;       /* Soft Brown/Grey Text */
+            --text-main: #5d4d55;       /* Soft Brown/Grey Text (Darker for readability) */
             --text-meta: #a8909c;       /* Lighter Meta Text */
             --accent: #ff9ebb;          /* Cute Pink Accent */
             --accent-hover: #ff7da3;    /* Darker Pink for Hover */
             --border: #fce4ec;          /* Very light border */
+            --time-badge-bg: #fff0f5;   /* Background for time badge */
+            --time-badge-text: #d81b60; /* Sharp Pink for time text */
         }
 
         body { 
             background-color: var(--bg-color); 
             color: var(--text-main); 
-            font-family: 'Quicksand', sans-serif; /* Cute rounded font */
+            font-family: 'Quicksand', sans-serif; 
             max-width: 700px; 
             margin: 0 auto; 
             padding: 20px; 
@@ -32,7 +34,7 @@
             display: flex;
             align-items: center;
             gap: 15px;
-            border-bottom: 2px dashed var(--accent); /* Cute dashed line */
+            border-bottom: 2px dashed var(--accent);
             padding-bottom: 15px;
             margin-bottom: 25px;
         }
@@ -42,7 +44,7 @@
             height: 60px;
             object-fit: contain;
             background: white;
-            border-radius: 50%; /* Circular Logo */
+            border-radius: 50%; 
             border: 3px solid white;
             box-shadow: 0 4px 10px rgba(255, 158, 187, 0.3);
         }
@@ -58,7 +60,7 @@
         .input-box { 
             background: var(--card-bg); 
             padding: 20px; 
-            border-radius: 20px; /* Very rounded */
+            border-radius: 20px; 
             box-shadow: 0 5px 15px rgba(255, 158, 187, 0.15);
             margin-bottom: 30px; 
             border: 1px solid white;
@@ -82,24 +84,21 @@
 
         .controls { margin-top: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between;}
         
-        /* Cute Buttons */
         button.post-btn { 
             cursor: pointer; 
             padding: 8px 25px; 
             background: var(--accent); 
             color: white; 
             border: none; 
-            border-radius: 25px; /* Pill shape */
-            font-weight: 600; 
+            border-radius: 25px; 
+            font-weight: 700; 
             font-size: 1em;
             transition: transform 0.1s, background 0.2s;
             box-shadow: 0 3px 10px rgba(255, 158, 187, 0.4);
         }
         button.post-btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
-        button.post-btn:active { transform: translateY(0); }
         button:disabled { background: #e0d4d8; cursor: not-allowed; transform: none; }
 
-        /* File Input Styling */
         input[type="file"] { font-size: 0.9em; color: var(--text-meta); }
 
         /* Post List */
@@ -127,31 +126,50 @@
         }
         
         .post-content { flex-grow: 1; min-width: 0; } 
-        .meta { 
-            font-size: 0.85em; 
-            color: var(--text-meta); 
-            margin-bottom: 8px; 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center;
-            font-weight: 600;
+        
+        /* Header inside post (Time + Delete) */
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
         }
+
+        /* The Time Badge - Makes it stand out! */
+        .time-badge {
+            background-color: var(--time-badge-bg);
+            color: var(--time-badge-text);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 700;
+            display: inline-block;
+            border: 1px solid #ffcdd2;
+        }
+        .time-ago {
+            font-weight: 400;
+            opacity: 0.8;
+            margin-left: 5px;
+            font-size: 0.9em;
+        }
+
         .text { 
             white-space: pre-wrap; 
             word-wrap: break-word; 
-            line-height: 1.5; 
+            line-height: 1.6; 
             color: var(--text-main);
+            font-size: 1.05em;
         }
 
-        /* Delete Button */
         .del-btn { 
             color: #ffb3b3; 
             cursor: pointer; 
-            font-size: 1.2em;
+            font-size: 1.4em;
             border: none; 
             background: none; 
-            padding: 0 5px;
+            padding: 0 0 0 10px;
             transition: color 0.2s;
+            line-height: 1;
         }
         .del-btn:hover { color: #ff4d4d; }
         
@@ -165,13 +183,12 @@
 <body>
 
     <div class="header-container">
-        <!-- Logo automatically pulled from your bucket -->
         <img src="" id="siteLogo" class="logo" alt="Logo" onerror="this.style.display='none'">
         <h1>/dump/ log</h1>
     </div>
 
     <div class="input-box">
-        <textarea id="textContent" placeholder="What's on your mind? ✨(>ᴗ•)"></textarea>
+        <textarea id="textContent" placeholder="What's on your mind? ✨"></textarea>
         <div class="controls">
             <input type="file" id="imageInput" accept="image/*">
             <button onclick="submitPost()" id="submitBtn" class="post-btn">Post 🌸</button>
@@ -193,8 +210,25 @@
         const bucketName = 'uploads';
         const tableName = 'posts';
 
-        // Set Logo URL automatically
         document.getElementById('siteLogo').src = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/logo.png`;
+
+        // Time Ago Logic
+        function timeAgo(dateParam) {
+            if (!dateParam) return null;
+            const date = typeof dateParam === 'object' ? dateParam : new Date(dateParam);
+            const today = new Date();
+            const seconds = Math.round((today - date) / 1000);
+            const minutes = Math.round(seconds / 60);
+            const hours = Math.round(minutes / 60);
+            const days = Math.round(hours / 24);
+            const years = Math.round(days / 365);
+
+            if (seconds < 60) return 'just now';
+            else if (minutes < 60) return `${minutes}m ago`;
+            else if (hours < 24) return `${hours}h ago`;
+            else if (days < 365) return `${days}d ago`;
+            else return `${years}y ago`;
+        }
 
         async function loadPosts() {
             const { data, error } = await sb
@@ -217,10 +251,19 @@
             }
 
             data.forEach(post => {
-                // Friendly Date Format
                 const dateObj = new Date(post.created_at);
-                const dateOptions = { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' };
-                const date = dateObj.toLocaleDateString('en-US', dateOptions); 
+                
+                // 1. Full Date with Year
+                const fullDate = dateObj.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric', 
+                    hour: 'numeric', 
+                    minute: 'numeric' 
+                });
+
+                // 2. Relative Time
+                const relativeTime = timeAgo(dateObj);
                 
                 let imgHtml = post.image_url ? 
                     `<div class="post-img"><a href="${post.image_url}" target="_blank"><img src="${post.image_url}"></a></div>` : '';
@@ -231,8 +274,10 @@
                     <div class="post" id="post-${post.id}">
                         ${imgHtml}
                         <div class="post-content">
-                            <div class="meta">
-                                <span>📅 ${date}</span>
+                            <div class="post-header">
+                                <div class="time-badge">
+                                    ${fullDate} <span class="time-ago">(${relativeTime})</span>
+                                </div>
                                 <button class="del-btn" onclick="${deleteAction}" title="Delete">×</button>
                             </div>
                             <div class="text">${escapeHtml(post.content)}</div>
@@ -295,7 +340,7 @@
         }
 
         async function deletePost(id, imageUrl) {
-            if (!confirm("Are you sure you want to delete this? (｡╯︵╰｡)")) return;
+            if (!confirm("Are you sure you want to delete this? 🥺")) return;
 
             if (imageUrl) {
                 const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
@@ -310,7 +355,7 @@
                 const el = document.getElementById(`post-${id}`);
                 if (el) {
                     el.style.opacity = '0';
-                    setTimeout(() => el.remove(), 300); // Fade out animation
+                    setTimeout(() => el.remove(), 300);
                 }
             }
         }

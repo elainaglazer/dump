@@ -314,11 +314,11 @@
             banner.classList.add(variant);
             banner.setAttribute('aria-hidden', 'false');
             banner.classList.add('visible');
-            // Auto-hide after 3s
+            // Auto-hide after 1.5s (shorter, less obtrusive)
             setTimeout(() => {
                 banner.classList.remove('visible');
                 banner.setAttribute('aria-hidden', 'true');
-            }, 3000);
+            }, 1500);
         }
 
         // --- Visit tracking ---

@@ -31,14 +31,7 @@ Image board. blatant rip off of 5ch, (even the ip leak)
 - **some chart i guess
 - **deterministic hashed IP address into <span style="color:#ff66aa;">unique IP address</span>**
 - **🧹 Maid Mode:** Hidden admin mode for delete + raw data.
-- <span style="
-  background: linear-gradient(to right, #00ffff, #ff77aa);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-weight: bold;
-">
-aqua iro palette
-</span>
+- ![Aqua Iro Palette](gradient_text.svg)
 
 ---
 

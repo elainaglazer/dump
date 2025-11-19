@@ -95,14 +95,18 @@
             font-size: 1em;
             transition: transform 0.1s, background 0.2s;
             box-shadow: 0 3px 10px rgba(255, 158, 187, 0.4);
+            /* Use inline-flex to vertically center emoji with text */
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
         .btn-emoji {
-        filter: drop-shadow(0 0 2px white) drop-shadow(0 0 4px white); 
-        margin-left: 4px;
-        display: inline-block;
-        vertical-align: middle;
-        font-size: 1.1em; /* Make it slightly bigger */
-}
+            filter: drop-shadow(0 0 2px white) drop-shadow(0 0 4px white); 
+            display: inline-block;
+            font-size: 1.1em; /* Make it slightly bigger */
+            /* small nudge to match optical baseline */
+            transform: translateY(1px);
+        }
         button.post-btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
         button:disabled { background: #e0d4d8; cursor: not-allowed; transform: none; }
 

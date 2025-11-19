@@ -84,10 +84,10 @@
             top: 18px;
             right: 18px;
             display: inline-block;
-            font-size: 0.85em;
+            font-size: 1.1em;       /* 🟢 Made text larger */
             color: var(--text-meta);
             background: #ffffff;
-            padding: 4px 8px;
+            padding: 10px 18px;     /* 🟢 Made button fatter/easier to click */
             border-radius: 999px;
             border: 1px solid rgba(255,255,255,0.92);
             box-shadow: 0 6px 18px rgba(0,0,0,0.06);
@@ -95,8 +95,9 @@
             z-index: 10001;
             pointer-events: auto;
             cursor: pointer;
+            transition: transform 0.1s ease; /* Optional: makes it smooth when clicking */
         }
-
+        #visit-count:active { transform: scale(0.95); }
         #visit-count .visit-main { font-weight: 800; color: var(--text-main); }
         #visit-count .visit-sub { font-size: 0.72em; color: var(--text-meta); margin-top: 2px; font-weight: 600; }
 
@@ -107,8 +108,8 @@
                 top: auto;
                 right: 12px;
                 bottom: 12px;
-                font-size: 0.75em;
-                padding: 3px 6px;
+                font-size: 0.95em;   /* 🟢 Much bigger on phone */
+                padding: 10px 16px;  /* 🟢 Easy to tap with thumb */
                 opacity: 0.95;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.06);
             }

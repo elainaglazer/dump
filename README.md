@@ -1,8 +1,9 @@
-# /dump/slop 🌸
+# Elaina toilet 🌸
 
 Have you ever wanted to save something non-important quickly?  
 Parsing links or images between your PC and phone?  
 And you don't want to annoy your social media friends by spamming their PMs either?
+Have you ever wish for a 4chan without the anons?
 
 ### → introducing **/dump/slop**
 
@@ -14,7 +15,7 @@ And you don't want to annoy your social media friends by spamming their PMs eith
 
 **Q: Paste.ee?**  
 **A:**  
-![Comparison](img/img1.png)
+![Comparison](img/pas.png)
 
 Have fun.
 
@@ -22,16 +23,22 @@ Have fun.
 
 ## 🌸 Features
 
-A **serverless, realtime personal imageboard**.
+Image board. blatant rip off of 5ch, (even the ip leak)
 
-- **⚡ Zero Friction:** No login required. Just open, type, and post.
-- **📱 Mobile Native:** PWA support. Add to Home Screen on iOS/Android.
-- **☁️ Cloud Sync:** Upload on PC, instantly accessible on your phone.
-- **🔄 Realtime:** Supabase Realtime push updates—no refresh.
-- **🕵️ Analytics:** Built-in “Maid Diary” dashboard using Chart.js.
-- **🆔 Identity System:** Deterministic pastel IP bubbles (unique per IP).
+- **No login
+- **Mobile friendly
+- **🔄 literally everything is real time refresh
+- **some chart i guess
+- **deterministic hashed IP address into <span style="color:#ff66aa;">unique IP address</span>**
 - **🧹 Maid Mode:** Hidden admin mode for delete + raw data.
-- **✨ Aesthetic:** Pastel pink theme with cute UI details.
+- <span style="
+  background: linear-gradient(to right, #00ffff, #ff77aa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: bold;
+">
+aqua iro palette
+</span>
 
 ---
 
@@ -71,10 +78,5 @@ Entirely serverless — runs free on Supabase + GitHub Pages.
 
 ## 🚀 Deployment
 
-1. Clone the repo.  
-2. Create a **Supabase** project (free tier).  
-3. Run SQL to create tables + enable Realtime.  
-4. Create a public storage bucket named `uploads`.  
-5. Update `SUPABASE_URL` and `SUPABASE_KEY` in `index.html` + `stat.html`.  
-6. Deploy via GitHub Pages.
+there's supabase so thats kinda annoying
 

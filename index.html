@@ -339,7 +339,7 @@
         }
 
         async function deletePost(id, imageUrl) {
-            if (!confirm("Are you sure you want to delete this? 🥺")) return;
+            if (!confirm("Delete this? action can't be reversed")) return;
 
             if (imageUrl) {
                 const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);

@@ -100,6 +100,9 @@
             transform: translateX(-50%) translateY(0);
             opacity: 1;
         }
+        /* Variant colors */
+        #maid-banner.maid { background: rgba(255, 158, 187, 0.08); color: var(--badge-maid-text); border-color: rgba(217, 102, 140, 0.12); }
+        #maid-banner.user { background: rgba(200, 230, 255, 0.08); color: #2a6ea3; border-color: rgba(120, 170, 220, 0.12); }
 
         /* Input Area */
         .input-box { 
@@ -155,6 +158,24 @@
         .badge { padding: 3px 10px; border-radius: 15px; font-size: 0.75em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
         .badge-maid { background: var(--badge-maid-bg); color: var(--badge-maid-text); border: 1px solid #b2ebf2; }
         .badge-anon { background: var(--badge-anon-bg); color: var(--badge-anon-text); border: 1px solid #e1bee7; }
+
+        /* IP bubble - background color is chosen deterministically per IP */
+        .ip-bubble {
+            display: inline-block;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75em;
+            padding: 4px 8px;
+            border-radius: 12px;
+            margin-left: 6px;
+            border: 1px solid rgba(0,0,0,0.03);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+        }
+
+        .post-id {
+            margin-right: 8px;
+            font-weight: 800;
+            color: var(--text-main);
+        }
 
         /* IP Address */
         .ip-tag { font-family: 'Fira Code', monospace; font-size: 0.7em; color: #bbb; letter-spacing: -0.5px; }
@@ -227,11 +248,33 @@
         const bucketName = 'uploads';
         const tableName = 'posts';
 
-        // Non-blocking top banner for admin notifications
-        function showMaidBanner(text = 'Welcome back, Maid! 🧹') {
+        // Non-blocking top banner for admin/user notifications
+        function hashStr(str) {
+            let h = 0;
+            for (let i = 0; i < str.length; i++) {
+                h = ((h << 5) - h) + str.charCodeAt(i);
+                h |= 0;
+            }
+            return Math.abs(h);
+        }
+
+        // Return background and text color for a given IP (deterministic pastel)
+        function ipPalette(ip) {
+            if (!ip) return { bg: '#f3f3f3', text: '#666' };
+            const h = hashStr(ip) % 360;
+            // light pastel background, stronger text color same hue
+            const bg = `hsl(${h}, 70%, 94%)`;
+            const text = `hsl(${h}, 60%, 28%)`;
+            return { bg, text };
+        }
+
+        // Generic banner that supports variants (maid/user) and auto-hides
+        function showBanner(text = 'Welcome back, Maid! 🧹', variant = 'maid') {
             const banner = document.getElementById('maid-banner');
             if (!banner) return;
             banner.textContent = text;
+            banner.classList.remove('maid', 'user');
+            banner.classList.add(variant);
             banner.setAttribute('aria-hidden', 'false');
             banner.classList.add('visible');
             // Auto-hide after 3s
@@ -247,7 +290,7 @@
             document.body.classList.add('admin-mode');
             // show subtle banner once on load so user knows admin mode is active
             // (no blocking popup)
-            setTimeout(() => showMaidBanner(), 250);
+            setTimeout(() => showBanner('Welcome back, Maid! 🧹', 'maid'), 100);
         }
 
         // Load Logo & Add Click Listener
@@ -262,9 +305,11 @@
             if (isAdmin) {
                 document.body.classList.add('admin-mode');
                 // show non-blocking top banner instead of alert
-                showMaidBanner();
+                showBanner('Welcome back, Maid! 🧹', 'maid');
             } else {
                 document.body.classList.remove('admin-mode');
+                // show banner to indicate return to user
+                showBanner('Returned to User', 'user');
             }
         });
 
@@ -317,7 +362,7 @@
 
             data.forEach(post => {
                 const dateObj = new Date(post.created_at);
-                const fullDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const fullDate = dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' });
                 const relativeTime = timeAgo(dateObj);
                 
                 let imgHtml = post.image_url ? 
@@ -331,8 +376,12 @@
                 const badgeClass = isMaid ? 'badge-maid' : 'badge-anon';
                 const displayRole = isMaid ? 'Maid' : 'Anonchama';
 
-                // Safe IP (Show '???' if missing)
-                const displayIP = post.ip ? `[${post.ip}]` : '';
+                // IP bubble (deterministic pastel color per IP)
+                let ipHtml = '';
+                if (post.ip) {
+                    const pal = ipPalette(post.ip);
+                    ipHtml = `<span class="ip-bubble" style="background:${pal.bg}; color:${pal.text};">[${post.ip}]</span>`;
+                }
 
                 const html = `
                     <div class="post" id="post-${post.id}">
@@ -340,9 +389,11 @@
                         <div class="post-content">
                             <div class="post-header">
                                 <span class="badge ${badgeClass}">● ${displayRole}</span>
-                                <span class="ip-tag">${displayIP}</span>
+                                ${ipHtml}
                                 <div class="time-meta">
-                                    <span>${fullDate} (${relativeTime})</span>
+                                    <span class="post-id">#${post.id}</span>
+                                    <span>${fullDate}</span>
+                                    <span class="time-ago">(${relativeTime})</span>
                                     <button class="del-btn" onclick="${deleteAction}" title="Delete">×</button>
                                 </div>
                             </div>

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Personal Dump</title>
-    <!-- Import Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { background-color: #1a1a1a; color: #e0e0e0; font-family: 'Courier New', monospace; max-width: 800px; margin: 0 auto; padding: 20px; }
@@ -14,21 +13,26 @@
         .input-box { background: #2d2d2d; padding: 15px; border: 1px solid #444; margin-bottom: 30px; }
         textarea { width: 100%; height: 80px; background: #111; color: white; border: 1px solid #555; padding: 5px; box-sizing: border-box; resize: vertical; }
         .controls { margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;}
-        button { cursor: pointer; padding: 5px 20px; background: #5c6bc0; color: white; border: none; font-weight: bold; }
-        button:hover { background: #7986cb; }
+        button.post-btn { cursor: pointer; padding: 5px 20px; background: #5c6bc0; color: white; border: none; font-weight: bold; }
+        button.post-btn:hover { background: #7986cb; }
         button:disabled { background: #444; color: #888; cursor: not-allowed; }
 
         /* Post List */
-        .post { background: #252525; border-bottom: 1px solid #333; padding: 15px 10px; margin-bottom: 10px; display: flex; gap: 15px; }
+        .post { background: #252525; border-bottom: 1px solid #333; padding: 15px 10px; margin-bottom: 10px; display: flex; gap: 15px; position: relative; }
+        .post:hover { background-color: #2a2a2a; }
+        
         .post-img a { display: block; }
         .post-img img { max-width: 150px; max-height: 150px; object-fit: cover; border: 1px solid #444; }
         .post-img img:hover { border-color: #777; }
         
-        .post-content { flex-grow: 1; min-width: 0; } /* min-width 0 fixes flex text wrap issues */
-        .meta { color: #757575; font-size: 0.75em; margin-bottom: 8px; }
+        .post-content { flex-grow: 1; min-width: 0; } 
+        .meta { color: #757575; font-size: 0.75em; margin-bottom: 8px; display: flex; justify-content: space-between; }
         .text { white-space: pre-wrap; word-wrap: break-word; line-height: 1.4; }
+
+        /* Delete Button */
+        .del-btn { color: #d32f2f; cursor: pointer; font-weight: bold; margin-left: 10px; border: none; background: none; padding: 0;}
+        .del-btn:hover { color: #ff5252; text-decoration: underline; }
         
-        /* Mobile Tweaks */
         @media (max-width: 600px) {
             .post { flex-direction: column; }
             .post-img img { max-width: 100%; max-height: 300px; }
@@ -43,7 +47,7 @@
         <textarea id="textContent" placeholder=">> Write something here..."></textarea>
         <div class="controls">
             <input type="file" id="imageInput" accept="image/*">
-            <button onclick="submitPost()" id="submitBtn">Post</button>
+            <button onclick="submitPost()" id="submitBtn" class="post-btn">Post</button>
         </div>
         <div id="status" style="font-size: 0.8em; margin-top: 5px; color: orange;"></div>
     </div>
@@ -62,7 +66,6 @@
         const bucketName = 'uploads';
         const tableName = 'posts';
 
-        // 1. Load Posts
         async function loadPosts() {
             const { data, error } = await sb
                 .from(tableName)
@@ -77,24 +80,30 @@
                 feed.innerHTML = `<div style="color:red; text-align:center;">Error: ${error.message}</div>`;
                 return;
             }
-
-            if (data.length === 0) {
-                feed.innerHTML = `<div style="text-align:center; color: #555;">No posts yet. Be the first.</div>`;
+            
+            if (!data || data.length === 0) {
+                feed.innerHTML = `<div style="text-align:center; color: #555;">No posts.</div>`;
                 return;
             }
 
             data.forEach(post => {
                 const date = new Date(post.created_at).toLocaleString();
                 
-                // HTML Template for a post
                 let imgHtml = post.image_url ? 
                     `<div class="post-img"><a href="${post.image_url}" target="_blank"><img src="${post.image_url}"></a></div>` : '';
                 
+                // We pass the ID and Image URL to the delete function
+                // We use single quotes for JS strings to avoid conflict with HTML double quotes
+                const deleteAction = `deletePost(${post.id}, '${post.image_url || ''}')`;
+
                 const html = `
-                    <div class="post">
+                    <div class="post" id="post-${post.id}">
                         ${imgHtml}
                         <div class="post-content">
-                            <div class="meta">No. ${post.id} <span style="margin-left:10px">${date}</span></div>
+                            <div class="meta">
+                                <span>No. ${post.id} | ${date}</span>
+                                <button class="del-btn" onclick="${deleteAction}">[x]</button>
+                            </div>
                             <div class="text">${escapeHtml(post.content)}</div>
                         </div>
                     </div>
@@ -103,7 +112,6 @@
             });
         }
 
-        // 2. Submit Logic
         async function submitPost() {
             const textInput = document.getElementById('textContent');
             const fileInput = document.getElementById('imageInput');
@@ -113,35 +121,29 @@
             const text = textInput.value;
             const file = fileInput.files[0];
 
-            if (!text && !file) return alert("Type something or upload an image.");
+            if (!text && !file) return alert("Type something.");
 
             btn.disabled = true;
             status.innerText = "Uploading...";
 
             let publicUrl = null;
 
-            // A. Upload Image if exists
             if (file) {
-                // Unique filename: timestamp + random number + original extension
                 const fileExt = file.name.split('.').pop();
                 const fileName = `${Date.now()}_${Math.floor(Math.random() * 1000)}.${fileExt}`;
                 
-                const { data, error } = await sb.storage.from(bucketName).upload(fileName, file);
+                const { error } = await sb.storage.from(bucketName).upload(fileName, file);
                 
                 if (error) {
                     alert("Image Upload failed: " + error.message);
-                    console.error(error);
                     btn.disabled = false;
-                    status.innerText = "";
                     return;
                 }
                 
-                // Get the public URL
                 const res = sb.storage.from(bucketName).getPublicUrl(fileName);
                 publicUrl = res.data.publicUrl;
             }
 
-            // B. Insert Data to DB
             const { error } = await sb.from(tableName).insert({ 
                 content: text, 
                 image_url: publicUrl 
@@ -149,30 +151,51 @@
 
             if (error) {
                 alert("Database error: " + error.message);
-                console.error(error);
             } else {
-                // Success: Reset form
                 textInput.value = '';
                 fileInput.value = '';
-                status.innerText = "Success!";
-                setTimeout(() => status.innerText = "", 2000);
-                loadPosts(); // Refresh list
+                status.innerText = "";
+                loadPosts();
             }
             btn.disabled = false;
         }
 
-        // Utility to prevent HTML injection (XSS)
-        function escapeHtml(text) {
-            if (!text) return '';
-            return text
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
+        async function deletePost(id, imageUrl) {
+            // Simple confirmation
+            if (!confirm("Delete this post?")) return;
+
+            // 1. Delete Image from Storage (if exists)
+            if (imageUrl) {
+                // Extract filename from URL: .../uploads/filename.jpg -> filename.jpg
+                const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
+                const { error: storageError } = await sb.storage.from(bucketName).remove([fileName]);
+                
+                if (storageError) {
+                    console.error("Error deleting image:", storageError);
+                    // We continue to delete the post even if image delete fails (e.g. already gone)
+                }
+            }
+
+            // 2. Delete Row from Database
+            const { error: dbError } = await sb
+                .from(tableName)
+                .delete()
+                .eq('id', id);
+
+            if (dbError) {
+                alert("Error deleting post: " + dbError.message);
+            } else {
+                // 3. Remove from screen immediately
+                const el = document.getElementById(`post-${id}`);
+                if (el) el.remove();
+            }
         }
 
-        // Start
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
         loadPosts();
     </script>
 </body>

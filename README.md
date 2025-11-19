@@ -7,15 +7,17 @@ Have you ever wish for a 4chan without the anons?
 
 ### → introducing **/dump/slop**
 
-**Q: Why don't you just chat with a bot and dump things there?**  
+>**Q: Why don't you just chat with a bot and dump things there?**
+
 **A:** It takes me 3 minutes to boot up Discord. Discord sucks.
 
-**Q: Catbox?**  
+>**Q: Catbox?**
+
 **A:** No text support.
 
-**Q: Paste.ee?**  
-**A:**  
-![Comparison](img/pas.png)
+>**Q: Paste.ee?**
+
+**A:**  ![Comparison](img/pas.png)
 
 Have fun.
 
@@ -27,23 +29,17 @@ Image board. blatant rip off of 5ch, (even the ip leak)
 
 - **No login
 - **Mobile friendly
-- **🔄 literally everything is real time refresh
+- **literally everything is real time refresh
 - **some chart i guess
-- **deterministic hashed IP address into <span style="color:#ff66aa;">unique IP address</span>**
+- **your ip is hashed so you get unique ip color
 - **🧹 Maid Mode:** Hidden admin mode for delete + raw data.
-- ![Aqua Iro Palette](gradient_text.svg)
-
+  ![Aqua Iro Palette](gradient_text.svg)
+- Everything is aqua colored!
 ---
 
 ## 🛠️ Technicalities
 
-Entirely serverless — runs free on Supabase + GitHub Pages.
-
-- **Frontend:** Vanilla HTML5 / CSS3 / JavaScript (no frameworks)
-- **Backend / DB:** Supabase (PostgreSQL)
-- **Storage:** Supabase Storage (S3-like)
-- **Visualization:** Chart.js
-- **Hosting:** GitHub Pages
+Entirely serverless runs on Supabase freeplan + GitHub Pages.
 
 ---
 
@@ -71,5 +67,5 @@ Entirely serverless — runs free on Supabase + GitHub Pages.
 
 ## 🚀 Deployment
 
-there's supabase so thats kinda annoying
+there's supabase so thats not recommended
 

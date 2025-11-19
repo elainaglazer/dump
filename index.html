@@ -404,8 +404,8 @@
             const modal = document.getElementById('maid-diary-modal');
             if (!modal) return;
             modal.setAttribute('aria-hidden', 'false');
-            // Load entries when opened
-            loadDiaryEntries();
+            // Show stats by default when opening the modal (lazy-load iframe)
+            switchToStats();
         }
 
         function closeDiary() {

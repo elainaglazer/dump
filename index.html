@@ -96,6 +96,13 @@
             transition: transform 0.1s, background 0.2s;
             box-shadow: 0 3px 10px rgba(255, 158, 187, 0.4);
         }
+        .btn-emoji {
+        filter: drop-shadow(0 0 2px white) drop-shadow(0 0 4px white); 
+        margin-left: 4px;
+        display: inline-block;
+        vertical-align: middle;
+        font-size: 1.1em; /* Make it slightly bigger */
+}
         button.post-btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
         button:disabled { background: #e0d4d8; cursor: not-allowed; transform: none; }
 
@@ -190,7 +197,9 @@
         <textarea id="textContent" placeholder="What's on your mind? ✨"></textarea>
         <div class="controls">
             <input type="file" id="imageInput" accept="image/*">
-            <button onclick="submitPost()" id="submitBtn" class="post-btn">Post 🌸</button>
+            <button onclick="submitPost()" id="submitBtn" class="post-btn">
+            Post <span class="btn-emoji">🌸</span>
+            </button>
         </div>
         <div id="status" style="font-size: 0.8em; margin-top: 10px; color: var(--accent-hover); text-align: right;"></div>
     </div>

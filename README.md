@@ -1,7 +1,8 @@
 # Elaina toilet 🌸
 
 Have you ever wanted to save something non-important quickly? like parsing links or images between your PC and phone?  
-And you don't want to annoy your social media friends by spamming their PMs either?
+But you don't want to annoy your social media friends by spamming their PMs either?
+
 how about 4chan without the anons?
 
 ### → introducing **/dump/slop**

@@ -77,18 +77,27 @@
         .sub-desc { font-size: 0.8em; color: var(--text-meta); margin-top: 5px; }
         .admin-indicator { color: var(--badge-maid-text); font-weight: bold; display: none; margin-top: 5px; font-size: 0.9em; }
 
-        /* Visit counter in header */
+        /* Visit counter (moved to top-right so it doesn't obstruct header) */
         #visit-count {
+            position: fixed;
+            top: 18px;
+            right: 18px;
             display: inline-block;
-            margin-left: 10px;
             font-size: 0.85em;
             color: var(--text-meta);
             background: #ffffff;
             padding: 4px 8px;
             border-radius: 999px;
-            border: 1px solid rgba(0,0,0,0.04);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+            border: 1px solid rgba(255,255,255,0.92);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.06);
             font-weight: 700;
+            z-index: 10001;
+            pointer-events: auto;
+        }
+
+        /* Hide the fixed visit pill on very small screens where it may still obstruct */
+        @media (max-width: 420px) {
+            #visit-count { display: none; }
         }
 
         /* Top-center banner for non-blocking admin notification */

@@ -1,79 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dump</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Dump</title>
+    <!-- Import Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { background-color: #1a1a1a; color: #e0e0e0; font-family: 'Courier New', monospace; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { border-bottom: 1px solid #333; padding-bottom: 10px; font-size: 1.5em; }
+        
+        /* Input Area */
+        .input-box { background: #2d2d2d; padding: 15px; border: 1px solid #444; margin-bottom: 30px; }
+        textarea { width: 100%; height: 80px; background: #111; color: white; border: 1px solid #555; padding: 5px; box-sizing: border-box; resize: vertical; }
+        .controls { margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;}
+        button { cursor: pointer; padding: 5px 20px; background: #5c6bc0; color: white; border: none; font-weight: bold; }
+        button:hover { background: #7986cb; }
+        button:disabled { background: #444; color: #888; cursor: not-allowed; }
 
-<!-- Minimal nice styling -->
-<style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #121212;
-        color: #e5e5e5;
-        margin: 0;
-        padding: 20px;
-        line-height: 1.6;
-    }
-    h1 {
-        margin-top: 0;
-        font-size: 28px;
-        text-align: center;
-    }
-    textarea {
-        width: 100%;
-        height: 300px;
-        background: #1e1e1e;
-        color: #dcdcdc;
-        border: 1px solid #333;
-        padding: 10px;
-        font-size: 16px;
-        border-radius: 6px;
-        resize: vertical;
-    }
-    .image-container {
-        margin-top: 30px;
-    }
-    .image-container img {
-        max-width: 100%;
-        margin-bottom: 20px;
-        border-radius: 8px;
-        border: 1px solid #333;
-    }
-    .footer {
-        margin-top: 50px;
-        font-size: 12px;
-        text-align: center;
-        opacity: 0.5;
-    }
-</style>
+        /* Post List */
+        .post { background: #252525; border-bottom: 1px solid #333; padding: 15px 10px; margin-bottom: 10px; display: flex; gap: 15px; }
+        .post-img a { display: block; }
+        .post-img img { max-width: 150px; max-height: 150px; object-fit: cover; border: 1px solid #444; }
+        .post-img img:hover { border-color: #777; }
+        
+        .post-content { flex-grow: 1; min-width: 0; } /* min-width 0 fixes flex text wrap issues */
+        .meta { color: #757575; font-size: 0.75em; margin-bottom: 8px; }
+        .text { white-space: pre-wrap; word-wrap: break-word; line-height: 1.4; }
+        
+        /* Mobile Tweaks */
+        @media (max-width: 600px) {
+            .post { flex-direction: column; }
+            .post-img img { max-width: 100%; max-height: 300px; }
+        }
+    </style>
 </head>
 <body>
 
-<h1>Dump</h1>
+    <h1>/dump/ - Personal Log</h1>
 
-<!-- Text dump section -->
-<h2>Text</h2>
-<textarea readonly>
-Write whatever text you want here.
-Edit this file on GitHub when needed.
-</textarea>
+    <div class="input-box">
+        <textarea id="textContent" placeholder=">> Write something here..."></textarea>
+        <div class="controls">
+            <input type="file" id="imageInput" accept="image/*">
+            <button onclick="submitPost()" id="submitBtn">Post</button>
+        </div>
+        <div id="status" style="font-size: 0.8em; margin-top: 5px; color: orange;"></div>
+    </div>
 
-<!-- Images section -->
-<h2>Images</h2>
-<div class="image-container">
-    <!-- Example images. Replace with your own -->
+    <div id="feed">
+        <div style="text-align:center; color: #555; margin-top: 20px;">Loading posts...</div>
+    </div>
 
+    <script>
+        // --- CONFIGURATION ---
+        const SUPABASE_URL = 'https://bxuupwldlyemividzjei.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4dXVwd2xkbHllbWl2aWR6amVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM1NjI1MjMsImV4cCI6MjA3OTEzODUyM30.QpHh8VIfskWW6oe7lIhjz0xo9Mf7Ed_o-A0w5wLI21w';
+        // ---------------------
 
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const bucketName = 'uploads';
+        const tableName = 'posts';
 
-    
-    <img src="img/aqua.png" alt="">
-<img src="img/1.png" alt="">
+        // 1. Load Posts
+        async function loadPosts() {
+            const { data, error } = await sb
+                .from(tableName)
+                .select('*')
+                .order('created_at', { ascending: false });
 
-    
-</div>
+            const feed = document.getElementById('feed');
+            feed.innerHTML = '';
 
-<div class="footer">Hosted on GitHub Pages • Simple dump site</div>
+            if (error) {
+                console.error(error);
+                feed.innerHTML = `<div style="color:red; text-align:center;">Error: ${error.message}</div>`;
+                return;
+            }
 
+            if (data.length === 0) {
+                feed.innerHTML = `<div style="text-align:center; color: #555;">No posts yet. Be the first.</div>`;
+                return;
+            }
+
+            data.forEach(post => {
+                const date = new Date(post.created_at).toLocaleString();
+                
+                // HTML Template for a post
+                let imgHtml = post.image_url ? 
+                    `<div class="post-img"><a href="${post.image_url}" target="_blank"><img src="${post.image_url}"></a></div>` : '';
+                
+                const html = `
+                    <div class="post">
+                        ${imgHtml}
+                        <div class="post-content">
+                            <div class="meta">No. ${post.id} <span style="margin-left:10px">${date}</span></div>
+                            <div class="text">${escapeHtml(post.content)}</div>
+                        </div>
+                    </div>
+                `;
+                feed.innerHTML += html;
+            });
+        }
+
+        // 2. Submit Logic
+        async function submitPost() {
+            const textInput = document.getElementById('textContent');
+            const fileInput = document.getElementById('imageInput');
+            const status = document.getElementById('status');
+            const btn = document.getElementById('submitBtn');
+
+            const text = textInput.value;
+            const file = fileInput.files[0];
+
+            if (!text && !file) return alert("Type something or upload an image.");
+
+            btn.disabled = true;
+            status.innerText = "Uploading...";
+
+            let publicUrl = null;
+
+            // A. Upload Image if exists
+            if (file) {
+                // Unique filename: timestamp + random number + original extension
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Date.now()}_${Math.floor(Math.random() * 1000)}.${fileExt}`;
+                
+                const { data, error } = await sb.storage.from(bucketName).upload(fileName, file);
+                
+                if (error) {
+                    alert("Image Upload failed: " + error.message);
+                    console.error(error);
+                    btn.disabled = false;
+                    status.innerText = "";
+                    return;
+                }
+                
+                // Get the public URL
+                const res = sb.storage.from(bucketName).getPublicUrl(fileName);
+                publicUrl = res.data.publicUrl;
+            }
+
+            // B. Insert Data to DB
+            const { error } = await sb.from(tableName).insert({ 
+                content: text, 
+                image_url: publicUrl 
+            });
+
+            if (error) {
+                alert("Database error: " + error.message);
+                console.error(error);
+            } else {
+                // Success: Reset form
+                textInput.value = '';
+                fileInput.value = '';
+                status.innerText = "Success!";
+                setTimeout(() => status.innerText = "", 2000);
+                loadPosts(); // Refresh list
+            }
+            btn.disabled = false;
+        }
+
+        // Utility to prevent HTML injection (XSS)
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Start
+        loadPosts();
+    </script>
 </body>
 </html>

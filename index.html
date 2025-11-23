@@ -153,7 +153,7 @@
             padding: 20px; 
             border-radius: 20px; 
             box-shadow: 0 5px 15px rgba(255, 158, 187, 0.15);
-            margin-bottom: 30px; 
+            margin-bottom: 12px; 
             border: 1px solid white;
         }
         
@@ -187,9 +187,10 @@
             border: 1px solid white; position: relative;
         }
         
+        .post-img { display:flex; gap:8px; flex-wrap:wrap; }
         .post-img a { display: block; }
         .post-img img { 
-            max-width: 180px; max-height: 180px; object-fit: cover; 
+            width: 140px; height: 140px; object-fit: cover; 
             border-radius: 12px; border: 1px solid var(--border);
         }
         .post-content { flex-grow: 1; min-width: 0; } 
@@ -241,6 +242,25 @@
         body.admin-mode .admin-indicator { display: block; }
         body.admin-mode .sub-desc { display: none; }
 
+        /* Pin button: hidden for normal users, visible for admins */
+        .pin-btn { display: none; background: none; border: none; font-size: 1.05em; cursor: pointer; padding: 0 6px; }
+        body.admin-mode .pin-btn { display: inline-block; }
+
+        /* Select checkbox for multi-delete (admin only) */
+        .select-checkbox { display: none; margin-right: 8px; transform: translateY(-1px); }
+        body.admin-mode .select-checkbox { display: inline-block; }
+
+        /* Delete Selected button visible only to admins */
+        #deleteSelectedBtn { display: none; }
+        body.admin-mode #deleteSelectedBtn { display: inline-block; }
+        #deleteSelectedBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* Disabled (pinned) checkbox appearance */
+        .select-checkbox:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* Visual marker for pinned posts (visible to all users) */
+        .pinned-badge { background: #fff3e0; color: #ff6f00; padding: 4px 8px; border-radius: 999px; font-weight: 700; font-size: 0.72em; margin-left: 6px; }
+
         @media (max-width: 600px) {
             .post { flex-direction: column; }
             .post-img img { max-width: 100%; max-height: 300px; }
@@ -264,6 +284,9 @@
     .modal-tabs { display:flex; gap:8px; margin-bottom:10px; }
     .tab-btn { padding:6px 10px; border-radius:999px; background:transparent; border:1px solid rgba(0,0,0,0.04); color:var(--text-meta); font-weight:700; cursor:pointer; }
     .tab-btn.active { background: var(--accent); color: white; border-color: transparent; }
+    /* Filter button placed under input: make it stand out from background */
+    #filterPinnedBtn { display: inline-block; margin: 8px 0 10px; background: white; color: var(--text-main); border: 2px solid var(--accent); padding: 8px 14px; border-radius: 12px; box-shadow: 0 6px 18px rgba(255,158,187,0.12); font-weight:800; }
+    #filterPinnedBtn.active { background: var(--accent); color: white; border-color: transparent; }
     #stats-iframe { width:100%; height:60vh; border: none; border-radius: 8px; display:block; }
     /* Chart container sizing: use wrapper so Chart.js can draw without CSS distortion */
     .chart-wrap { height: 240px; }
@@ -310,7 +333,7 @@
     <div class="input-box">
         <textarea id="textContent" placeholder="What's on your mind? ✨"></textarea>
         <div class="controls">
-            <input type="file" id="imageInput" accept="image/*">
+            <input type="file" id="imageInput" accept="image/*" multiple>
             <button onclick="submitPost()" id="submitBtn" class="post-btn">
             Post <span class="btn-emoji">🌸</span>
             </button>
@@ -318,8 +341,14 @@
         <div id="status" style="font-size: 0.8em; margin-top: 10px; color: var(--accent-hover); text-align: right;"></div>
     </div>
 
+    <!-- Controls placed right below the input box (filter + delete selected) -->
+    <div class="controls-row" style="text-align:left; display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+        <button id="filterPinnedBtn" class="tab-btn">All posts</button>
+        <button id="deleteSelectedBtn" class="tab-btn" style="background:#ffeef0; border-color:#ff7da3; color:var(--accent-hover);" disabled>Delete Selected</button>
+    </div>
+
     <div id="feed">
-        <div style="text-align:center; color: var(--text-meta); margin-top: 40px;">Loading posts... 🐇</div>
+        <div style="text-align:center; color: var(--text-meta); margin-top: 12px;">Loading posts... 🐇</div>
     </div>
 
     <!-- Maid Diary Modal -->
@@ -388,6 +417,58 @@
         const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const bucketName = 'uploads';
         const tableName = 'posts';
+
+        // Persistent anonymous user id stored in localStorage
+        function uuidv4() {
+            if (window.crypto && crypto.getRandomValues) {
+                const buf = new Uint8Array(16);
+                crypto.getRandomValues(buf);
+                // Per RFC4122 v4
+                buf[6] = (buf[6] & 0x0f) | 0x40;
+                buf[8] = (buf[8] & 0x3f) | 0x80;
+                const hex = [...buf].map(b => b.toString(16).padStart(2, '0')).join('');
+                return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+            }
+            // fallback
+            return 'anon-' + Math.random().toString(36).slice(2,10);
+        }
+
+        function getAnonId() {
+            try {
+                let id = localStorage.getItem('elaina_anon_id');
+                if (!id) {
+                    id = uuidv4();
+                    localStorage.setItem('elaina_anon_id', id);
+                }
+                return id;
+            } catch (e) {
+                return 'anon-fallback';
+            }
+        }
+
+        const ANON_ID = getAnonId();
+        // friendly short label like user#3
+        function anonLabel(id) {
+            const n = (hashStr(id) % 999) + 1;
+            return `user#${n}`;
+        }
+
+        // --- Server-assigned ordered user id ---
+        // This will upsert into `anon_users` table and return the server id (1,2,3...).
+        async function getOrCreateAnonUser() {
+            try {
+                // upsert by anon_id (anon_id must be UNIQUE in anon_users table)
+                const { data, error } = await sb.from('anon_users').upsert({ anon_id: ANON_ID }, { onConflict: 'anon_id' }).select('id').maybeSingle();
+                if (error) {
+                    console.warn('anon_users upsert error', error);
+                    return null;
+                }
+                return data?.id ?? null;
+            } catch (e) {
+                console.warn('getOrCreateAnonUser failed', e);
+                return null;
+            }
+        }
 
         // Non-blocking top banner for admin/user notifications
         function hashStr(str) {
@@ -708,42 +789,80 @@
             });
         }
 
-        async function loadPosts() {
-            const { data, error } = await sb
-                .from(tableName)
-                .select('*')
-                .order('created_at', { ascending: false });
+        // Client-side filter state: show only pinned posts when true
+        let filterPinned = false;
 
+        async function loadPosts(showOnlyPinned = false) {
             const feed = document.getElementById('feed');
-            
-            if (error) {
-                console.error(error);
-                feed.innerHTML = `<div style="color:var(--accent-hover); text-align:center;">Opps! Error: ${error.message}</div>`;
-                return;
-            }
-            
-            if (!data || data.length === 0) {
-                feed.innerHTML = `<div style="text-align:center; color: var(--text-meta); padding: 40px;">No posts yet.<br>Be the first to write something! ✨</div>`;
-                return;
-            }
+            feed.innerHTML = `<div style="text-align:center; color: var(--text-meta); padding: 40px;">Loading posts... 🐇</div>`;
 
-            feed.innerHTML = ''; 
+            try {
+                let q = sb.from(tableName).select('*').order('created_at', { ascending: false });
+                if (showOnlyPinned) q = q.eq('pinned', true);
+                const { data, error } = await q;
+
+                if (error) {
+                    console.error(error);
+                    // If the error is due to missing column when trying to filter, inform the admin
+                    if (showOnlyPinned) {
+                        showBanner('Pinned filter unavailable — run DB migration', 'user');
+                        // Retry without filter
+                        const { data: fallback, error: fallbackErr } = await sb.from(tableName).select('*').order('created_at', { ascending: false });
+                        if (fallbackErr) throw fallbackErr;
+                        renderPosts(fallback || []);
+                        return;
+                    }
+                    feed.innerHTML = `<div style="color:var(--accent-hover); text-align:center;">Opps! Error: ${error.message}</div>`;
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    feed.innerHTML = `<div style="text-align:center; color: var(--text-meta); padding: 40px;">No posts yet.<br>Be the first to write something! ✨</div>`;
+                    return;
+                }
+
+                renderPosts(data);
+            } catch (e) {
+                console.error('loadPosts exception', e);
+                feed.innerHTML = `<div style="color:var(--accent-hover); text-align:center;">Error loading posts.</div>`;
+            }
+        }
+
+        // Render posts array into the feed DOM
+        function renderPosts(data) {
+            const feed = document.getElementById('feed');
+            feed.innerHTML = '';
 
             data.forEach(post => {
                 const dateObj = new Date(post.created_at);
                 const fullDate = dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric' });
                 const relativeTime = timeAgo(dateObj);
-                
-                let imgHtml = post.image_url ? 
-                    `<div class="post-img"><a href="${post.image_url}" target="_blank"><img src="${post.image_url}"></a></div>` : '';
-                
-                const deleteAction = `deletePost(${post.id}, '${post.image_url || ''}')`;
+
+                // Support multiple images: stored as comma-separated `image_url`
+                let imgHtml = '';
+                const images = (post.image_url || '').split(',').map(s => s.trim()).filter(Boolean);
+                if (images.length > 0) {
+                    const imgs = images.map(u => `<a href="${u}" target="_blank"><img src="${u}"></a>`).join('');
+                    imgHtml = `<div class="post-img">${imgs}</div>`;
+                }
+
+                const encodedImages = encodeURIComponent(images.join(','));
+                const deleteAction = `deletePost(${post.id}, '${encodedImages}')`;
 
                 // Determine Badge
                 const role = post.role || 'Anonchama';
                 const isMaid = role === 'Maid';
                 const badgeClass = isMaid ? 'badge-maid' : 'badge-anon';
                 const displayRole = isMaid ? 'Maid' : 'Anonchama';
+
+                // User bubble (deterministic pastel color per anon id)
+                let userHtml = '';
+                if (post.anon_user_id || post.anon_id) {
+                    const key = post.anon_user_id ? String(post.anon_user_id) : post.anon_id;
+                    const pal = ipPalette(key);
+                    const label = post.anon_user_id ? `user#${post.anon_user_id}` : anonLabel(post.anon_id);
+                    userHtml = `<span class="ip-bubble" style="background:${pal.bg}; color:${pal.text};">${label}</span>`;
+                }
 
                 // IP bubble (deterministic pastel color per IP)
                 let ipHtml = '';
@@ -752,18 +871,27 @@
                     ipHtml = `<span class="ip-bubble" style="background:${pal.bg}; color:${pal.text};">[${post.ip}]</span>`;
                 }
 
+                const pinnedHtml = post.pinned ? `<span class="pinned-badge">Pinned</span>` : '';
+                const pinBtn = `<button class="pin-btn" onclick="togglePin(${post.id}, ${post.pinned ? 'true' : 'false'})" title="${post.pinned ? 'Unpin' : 'Pin'}">${post.pinned ? '📌' : '📍'}</button>`;
+                // If pinned, disable the checkbox so it cannot be selected
+                const checkboxDisabled = post.pinned ? 'disabled' : '';
+                const checkboxHtml = `<input type="checkbox" class="select-checkbox" data-id="${post.id}" data-images="${encodedImages || ''}" title="Select post ${post.id} for deletion" ${checkboxDisabled}>`;
+
                 const html = `
                     <div class="post" id="post-${post.id}">
                         ${imgHtml}
                         <div class="post-content">
                             <div class="post-header">
                                 <span class="badge ${badgeClass}">● ${displayRole}</span>
+                                ${userHtml}
                                 ${ipHtml}
+                                ${pinnedHtml}
                                 <div class="time-meta">
                                     <span class="post-id">#${post.id}</span>
                                     <span>${fullDate}</span>
                                     <span class="time-ago">(${relativeTime})</span>
-                                    <button class="del-btn" onclick="${deleteAction}" title="Delete">×</button>
+                                    ${pinBtn}
+                                    ${checkboxHtml}
                                 </div>
                             </div>
                             <div class="text">${linkify(escapeHtml(post.content))}</div>
@@ -772,6 +900,21 @@
                 `;
                 feed.innerHTML += html;
             });
+
+            // After rendering, wire up checkbox listeners so the Delete Selected button state stays in sync
+            const checks = Array.from(document.querySelectorAll('.select-checkbox'));
+            checks.forEach(ch => ch.addEventListener('change', updateDeleteSelectedState));
+            // ensure initial state
+            updateDeleteSelectedState();
+        }
+
+        // Enable Delete Selected only when admin and at least one non-disabled checkbox is checked
+        function updateDeleteSelectedState() {
+            const deleteBtn = document.getElementById('deleteSelectedBtn');
+            if (!deleteBtn) return;
+            const anyChecked = Array.from(document.querySelectorAll('.select-checkbox:checked')).length > 0;
+            // show enabled only if admin and there are checked items
+            deleteBtn.disabled = !anyChecked;
         }
 
         async function submitPost() {
@@ -800,38 +943,50 @@
 
             status.innerText = "Uploading... ☁️";
             let publicUrl = null;
+            let publicUrls = [];
 
-            // 2. Upload Image
+            // 2. Upload Images (support multiple)
             if (file) {
-                const fileExt = file.name.split('.').pop();
-                const fileName = `${Date.now()}_${Math.floor(Math.random() * 1000)}.${fileExt}`;
-                
-                const { error } = await sb.storage.from(bucketName).upload(fileName, file);
-                
-                if (error) {
-                    alert("Image Upload failed: " + error.message);
-                    btn.disabled = false;
-                    status.innerText = "Error ❌";
-                    return;
+                // fileInput.files may contain multiple files
+                const files = Array.from(fileInput.files || []);
+                for (const f of files) {
+                    const fileExt = f.name.split('.').pop();
+                    const fileName = `${Date.now()}_${Math.floor(Math.random() * 1000)}_${encodeURIComponent(f.name)}`;
+                    const { error } = await sb.storage.from(bucketName).upload(fileName, f);
+                    if (error) {
+                        console.warn('Image upload failed for', f.name, error);
+                        // continue uploading other files, inform user
+                        showBanner('Some images failed to upload', 'user');
+                        continue;
+                    }
+                    const res = sb.storage.from(bucketName).getPublicUrl(fileName);
+                    if (res && res.data && res.data.publicUrl) publicUrls.push(res.data.publicUrl);
                 }
-                
-                const res = sb.storage.from(bucketName).getPublicUrl(fileName);
-                publicUrl = res.data.publicUrl;
+                if (publicUrls.length > 0) publicUrl = publicUrls[0];
             }
 
             // 3. Determine Role
             const currentRole = isAdmin ? 'Maid' : 'Anonchama';
 
             // 4. Insert to DB
-            const { error } = await sb.from(tableName).insert({ 
+            // Ensure we have a server-assigned ordered user id (anon_user_id)
+            let anon_user_id = null;
+            try { anon_user_id = await getOrCreateAnonUser(); } catch (e) { console.warn(e); }
+
+            // If multiple images, store them as a comma-separated list in `image_url` (keeps schema compatible)
+            const insertPayload = { 
                 content: text, 
-                image_url: publicUrl,
+                image_url: publicUrls.length > 0 ? publicUrls.join(',') : publicUrl,
                 ip: userIP,
-                role: currentRole
-            });
+                role: currentRole,
+                anon_id: ANON_ID
+            };
+            if (anon_user_id) insertPayload.anon_user_id = anon_user_id;
+
+            const { error } = await sb.from(tableName).insert(insertPayload);
 
             if (error) {
-                alert("Database error: " + error.message + "\n(Did you run the SQL command to add 'ip' and 'role' columns?)");
+                alert("Database error: " + error.message + "\n(Did you run the SQL command to add 'ip', 'role' and 'anon_id' columns?)");
                 status.innerText = "Error ❌";
             } else {
                 textInput.value = '';
@@ -842,12 +997,21 @@
             btn.disabled = false;
         }
 
-        async function deletePost(id, imageUrl) {
+        async function deletePost(id, encodedImageList) {
             if (!confirm("Delete this? action can't be reversed")) return;
 
-            if (imageUrl) {
-                const fileName = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
-                await sb.storage.from(bucketName).remove([fileName]);
+            // encodedImageList is URI-encoded comma-separated list of image URLs
+            try {
+                if (encodedImageList) {
+                    const joined = decodeURIComponent(encodedImageList || '');
+                    const images = joined ? joined.split(',').map(s => s.trim()).filter(Boolean) : [];
+                    const toRemove = images.map(u => u.substring(u.lastIndexOf('/') + 1));
+                    if (toRemove.length > 0) {
+                        await sb.storage.from(bucketName).remove(toRemove);
+                    }
+                }
+            } catch (e) {
+                console.warn('Error removing files from storage', e);
             }
 
             const { error: dbError } = await sb.from(tableName).delete().eq('id', id);
@@ -867,7 +1031,7 @@
         const channel = sb
             .channel('public:posts')
             .on('postgres_changes', { event: '*', schema: 'public', table: tableName }, (payload) => {
-                loadPosts(); 
+                loadPosts(filterPinned);
             })
             .subscribe();
 
@@ -887,11 +1051,94 @@
             visitBtn.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDiary(); } });
         }
 
+        // Pinned filter toggle button
+        const filterBtn = document.getElementById('filterPinnedBtn');
+        if (filterBtn) {
+            filterBtn.addEventListener('click', () => {
+                filterPinned = !filterPinned;
+                filterBtn.classList.toggle('active', filterPinned);
+                filterBtn.innerText = filterPinned ? 'Pinned only' : 'All posts';
+                loadPosts(filterPinned);
+            });
+        }
+
+        // Delete selected posts (admin only)
+        const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+        if (deleteSelectedBtn) {
+            deleteSelectedBtn.addEventListener('click', deleteSelectedPosts);
+        }
+
+        async function deleteSelectedPosts() {
+            if (!isAdmin) { showBanner('Delete is admin-only', 'user'); return; }
+            const checks = Array.from(document.querySelectorAll('.select-checkbox:checked'));
+            if (checks.length === 0) { showBanner('No posts selected', 'user'); return; }
+            if (!confirm(`Delete ${checks.length} selected post(s)? This cannot be undone.`)) return;
+
+            // collect ids and filenames
+            const ids = [];
+            const filenames = [];
+            checks.forEach(ch => {
+                const id = Number(ch.dataset.id);
+                if (!isNaN(id)) ids.push(id);
+                const encoded = ch.dataset.images || '';
+                if (encoded) {
+                    const joined = decodeURIComponent(encoded || '');
+                    const imgs = joined ? joined.split(',').map(s => s.trim()).filter(Boolean) : [];
+                    imgs.forEach(u => {
+                        const fn = u.substring(u.lastIndexOf('/') + 1);
+                        if (fn) filenames.push(fn);
+                    });
+                }
+            });
+
+            // try removing storage objects first (ignore errors)
+            try {
+                const uniqueFiles = [...new Set(filenames)];
+                if (uniqueFiles.length > 0) await sb.storage.from(bucketName).remove(uniqueFiles);
+            } catch (e) {
+                console.warn('Error removing files from storage', e);
+            }
+
+            // delete posts in bulk
+            try {
+                const { error } = await sb.from(tableName).delete().in('id', ids);
+                if (error) {
+                    console.warn('bulk delete error', error);
+                    showBanner('Error deleting posts', 'user');
+                    return;
+                }
+                showBanner(`Deleted ${ids.length} post(s)`, 'maid');
+                loadPosts(filterPinned);
+            } catch (e) {
+                console.warn('deleteSelectedPosts exception', e);
+                showBanner('Error deleting posts', 'user');
+            }
+        }
+
+        // Toggle pin/unpin for a post (admin only)
+        async function togglePin(postId, currentlyPinned) {
+            if (!isAdmin) { showBanner('Pinning is admin-only', 'user'); return; }
+            try {
+                const { error } = await sb.from(tableName).update({ pinned: !currentlyPinned }).eq('id', postId);
+                if (error) {
+                    console.warn('pin update error', error);
+                    showBanner('Pin update failed', 'user');
+                    return;
+                }
+                showBanner(!currentlyPinned ? 'Pinned post' : 'Unpinned post', 'maid');
+                // Refresh posts respecting current filter
+                loadPosts(filterPinned);
+            } catch (e) {
+                console.warn('togglePin exception', e);
+                showBanner('Error updating pin', 'user');
+            }
+        }
+
         // Initial Load
         // Start: record visit then load posts
         (async () => {
             try { await recordVisit(); } catch (e) { console.warn(e); }
-            loadPosts();
+            loadPosts(filterPinned);
         })();
     </script>
 </body>

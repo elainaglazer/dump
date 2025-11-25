@@ -25,13 +25,10 @@ Have fun.
 
 Image board. blatant rip off of 5ch, (even the ip leak)
 
-- *No login*
-- *pretty lightweight*
-- *Mobile friendly*
-- *everything refreshes in real time*
-- *some charts*
+- lightweight, mobile friendly, real time update
+- *stat page*
 - *your ip is hashed so you get unique ip color bubble*
-- *🧹 Maid Mode:** Hidden admin mode for delete + raw data.*
+- Hidden admin mode for delete + raw data.
   ![Aqua Iro Palette](gradient_text.svg)
 - Everything is aqua colored!
 ---

@@ -1,4 +1,4 @@
-# Elaina toilet 🌸
+# Elaina toire 🌸
 
 Need a quick way to save links or images between your PC and phone without spamming your friends?
 how about 4chan without the anons?
